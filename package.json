@@ -1,0 +1,21 @@
+{
+  "name": "lazylist",
+  "version": "0.8.0",
+  "description": "Data structures that compute their elements only when needed",
+  "main": "build/main.js",
+  "scripts": {
+    "save": "npm publish & push"
+  },
+  "keywords": [
+    "ienumerable",
+    "enumerable",
+    "lazy",
+    "list"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AFatNiBBa/lazylist"
+  },
+  "author": "AFatNiBBa",
+  "license": "ISC"
+}
