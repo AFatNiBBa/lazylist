@@ -1,5 +1,5 @@
 {
-  "name": "lazylist",
+  "name": "lazylist.js",
   "version": "0.8.0",
   "description": "Data structures that compute their elements only when needed",
   "main": "build/main.js",
