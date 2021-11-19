@@ -283,7 +283,8 @@ var LazyList;
             this.data = data;
         }
         *[Symbol.iterator]() {
-            yield* this.data;
+            if (this.data)
+                yield* this.data;
         }
         /**
          * Calculate the base iterable.

@@ -326,7 +326,8 @@ namespace LazyList
         constructor(public data: Iterable<I>) { super(); }
 
         *[Symbol.iterator](): Iterator<O> {
-            yield* this.data as any as Iterable<O>;
+            if (this.data)
+                yield* this.data as any as Iterable<O>;
         }
 
         /**

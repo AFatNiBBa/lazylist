@@ -1,6 +1,6 @@
 {
   "name": "lazylist.js",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Data structures that compute their elements only when needed",
   "main": "build/main.js",
   "scripts": {
