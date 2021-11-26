@@ -3,11 +3,11 @@
 Data structures that compute their elements only when needed <br>
 Even in the browser! Just add this to your HTML code...
 ```html
-<script src="https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/build/main.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/bin/main.js"></script>
 ```
 ...or this to your JavaScript
 ```js
-document.head.append(Object.assign(document.createElement("script"), { src: "https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/build/main.js" }));
+document.head.append(Object.assign(document.createElement("script"), { src: "https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/bin/main.js" }));
 ```
 
 ## Usage
@@ -47,7 +47,7 @@ For the details look at the JSDocs.
 
 ### **Lists**
 Methods that generate other `LazyList`s
-- (static) **`range`**: Creates a new list that will iterate through the specified boundaries
+- (static) **`range`**: Creates a new list that will iterate through the specified boundaries (both the `begin` and `end` boundaries are included); The `count` operation will be calculated on this type of list 
 - (static) **`from`**: Returns a new list that wraps the provided iterable object
 - **`concat`**: Concat the current list to an iterable
 - **`zip`**: Combines the current list to an iterable based on a provided function
@@ -57,6 +57,7 @@ Methods that generate other `LazyList`s
 - **`skip`**: Skips the first `n` elements of the list
 - **`take`**: Takes the first `n` elements of the list and skips the rest
 - (non lazy) **`groupBy`**: Groups the current list's elements based on a provided function
+- (non lazy) **`sort`**: Sorts the current list's elements based on a provided function
 - (non lazy) **`reverse`**: Reverses the current list
 - **`repeat`**: Repeat the current list's elements `n` times
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
