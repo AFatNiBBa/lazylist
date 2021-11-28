@@ -1,8 +1,7 @@
 
 /*
-    [WIP]: slice()
-        [WIP]: unsafe (ma più "lazy")
-    [WIP]: join()
+    [MAY]: fix `new LazyRangeList().count`
+    [WIP]: `join()`
         [WIP]: outer, inner, left, right
 */
 
@@ -20,6 +19,12 @@ export type UConvert<X, Y, T = Y> = (x: X, i: number, data: Iterable<T>) => Y;
  * A function that indicates the "truthyness" of a value.
  */
 export type UPredicate<T> = UConvert<T, boolean, T>;
+
+/**
+ * An iterator that may have a "done" property.
+ * If not present is `false` by default.
+ */
+export type UMarkedIterator<T> = Iterator<T> & { done?: boolean };
 
 namespace LazyList
 {
@@ -58,7 +63,7 @@ namespace LazyList
     
         /**
          * Returns a `LazyList` based on an iterable.
-         * If `data` is already a `LazyList`, it gets returned directly.
+         * If `data` is already a `LazyList`, it gets returned directly, otherwise it gets wrapped in a `LazyDataList`.
          * @param data The iterable
          */
         static from<T>(data: Iterable<T>): LazyList<T> {
@@ -86,7 +91,7 @@ namespace LazyList
         }
     
         /**
-         * Converts the current list based on `f`.
+         * Converts the list based on `f`.
          * @param f A conversion function
          */
         select<TResult>(f: UConvert<O, TResult>): LazySelectList<O, TResult> {
@@ -102,7 +107,7 @@ namespace LazyList
         }
     
         /**
-         * Filters the current list based on `f`.
+         * Filters the list based on `f`.
          * @param f A predicate function
          */
         where(f: UPredicate<O>): LazyWhereList<O> {
@@ -124,6 +129,21 @@ namespace LazyList
          */
         take(n: number, outer?: UMode | boolean): LazyTakeList<O> {
             return new LazyTakeList<O>(this, n, outer);
+        }
+
+        /**
+         * Groups the list's elements, `n` at a time.
+         * Non lazy by default, but can be made lazy by setting `lazy` as `true`.
+         * If the list is set to lazy you should NEVER calculate the parent iterator before the childrens, like:
+         * 
+         *     LazyList.from([1,2,3]).slice(2,false,true).value; // Stops
+         * Additionally a lot of unexpected behaviours could occur.
+         * @param n The length of each slice
+         * @param outer If truthy, every slice will be forced to have `n` elements by concatenating as many `undefined` as needed
+         * @param lazy Indicates if the list should be lazy (and unsafe)
+         */
+        slice(n: number, outer?: UMode | boolean, lazy?: boolean): LazySliceList<O> {
+            return new LazySliceList<O>(this, n, outer, lazy);
         }
 
         /**
@@ -176,7 +196,7 @@ namespace LazyList
         }
 
         /**
-         *  Utility function that specifies how two iterables of different lengths should be conbined.
+         * Utility function that specifies how two iterables of different lengths should be conbined.
          * @param other An iterable
          * @param mode Different length handling
          */
@@ -185,14 +205,29 @@ namespace LazyList
         }
 
         /**
+         * Executes `f` on each element of the list and returns the current element (not the output of `f`).
+         * @param f A function
+         */
+        but(f: UConvert<O, void, O>): LazySelectList<O, O> {
+            return new LazySelectList<O, O>(this, (e, i, data) => (f(e, i, data), e));
+        }
+
+        /**
          * Calculates each element of the list and wraps them in another `LazyList`.
          */
         calc(): LazyDataList<O, O> {
             return LazyList.from(this.value) as LazyDataList<O, O>;
         }
+
+        /**
+         * Calculates and awaits each element of the list and wraps them in another `LazyList`.
+         */
+        async await(): Promise<LazyDataList<O, O>> {
+            return LazyList.from(await Promise.all(this.value)) as LazyDataList<O, O>;
+        }
     
         /**
-         * Aggregates the current list based on `f`.
+         * Aggregates the list based on `f`.
          * @param f A combination function
          * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration).
          */
@@ -341,7 +376,8 @@ namespace LazyList
         }
 
         /**
-         * Calculate the base iterable.
+         * Utility function that calculates the base iterable.
+         * If the base iterable is an `Array` it will be returned directly.
          */
         base(): O[] {
             return this.data instanceof Array
@@ -459,14 +495,41 @@ namespace LazyList
     export class LazyTakeList<T> extends LazyDataList<T, T> {
         constructor(data: Iterable<T>, public n: number, public outer: UMode | boolean = false) { super(data); }
 
-        *[Symbol.iterator](): Iterator<T> {
-            const iter = this.data[Symbol.iterator]();
-            for (var i = 0; i < this.n; i++)
+        /**
+         * Utility function that takes `n` elements from `iter`.
+         * @param iter The marked iterator
+         * @param n The elements to take
+         * @param outer If truthy and `n` is more than the iterator length, the output will be forced to have length `n` by yielding as many `undefined` as needed
+         */
+        static *take<T>(iter: UMarkedIterator<T>, n: number, outer: UMode | boolean = false) {
+            for (var i = 0; i < n; i++) // If this were a foreach loop the first element after `n` would be calculated too
             {
                 const e = iter.next();
-                if (e.done && !this.outer)
+                if ((iter.done = e.done) && !outer)
                     break;
                 yield e.value;
+            }
+        }
+
+        *[Symbol.iterator](): Iterator<T> {
+            yield* LazyTakeList.take<T>(this.data[Symbol.iterator](), this.n, this.outer);
+        }
+    }
+
+    /**
+     * Output of `list.slice()`.
+     */
+    export class LazySliceList<T> extends LazyDataList<T, LazyList<T>> {
+        constructor(data: Iterable<T>, public n: number, public outer: UMode | boolean = false, public lazy: boolean = false) { super(data); }
+
+        *[Symbol.iterator](): Iterator<LazyList<T>> {
+            const iter: UMarkedIterator<T> = this.data[Symbol.iterator]();
+            while (!(iter.done ?? false))
+            {
+                const e = LazyList.from(LazyTakeList.take<T>(iter, this.n, this.outer));
+                yield this.lazy
+                    ? e
+                    : e.calc();
             }
         }
     }
@@ -506,7 +569,7 @@ namespace LazyList
      * Output of `list.sort()`.
      */
     export class LazySortList<T> extends LazyDataList<T, T> {
-        constructor(data: Iterable<T>, public f: UCombine<T, T, number, T> = (a, b) => a > b ? 1 : a < b ? -1 : 0, public desc: boolean = false) { super(data); }
+        constructor(data: Iterable<T>, public f?: UCombine<T, T, number, T>, public desc: boolean = false) { super(data); }
 
         *[Symbol.iterator](): Iterator<T> {
             const map = new Map<T, number>();
@@ -517,7 +580,7 @@ namespace LazyList
             {
                 var out: T, n: number = 0;
                 for (const e of map)
-                    if (!n || (this.f(e[0], out, -1, this) < 0) !== this.desc)
+                    if (!n || (this.f ? this.f(e[0], out, -1, this) < 0 : e[0] < out) !== this.desc)
                         [ out, n ] = e;
 
                 for (var i = 0; i < n; i++)

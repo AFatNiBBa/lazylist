@@ -1,7 +1,6 @@
 /*
-    [WIP]: slice()
-        [WIP]: unsafe (ma più "lazy")
-    [WIP]: join()
+    [MAY]: fix `new LazyRangeList().count`
+    [WIP]: `join()`
         [WIP]: outer, inner, left, right
 */
 var LazyList;
@@ -35,7 +34,7 @@ var LazyList;
         }
         /**
          * Returns a `LazyList` based on an iterable.
-         * If `data` is already a `LazyList`, it gets returned directly.
+         * If `data` is already a `LazyList`, it gets returned directly, otherwise it gets wrapped in a `LazyDataList`.
          * @param data The iterable
          */
         static from(data) {
@@ -60,7 +59,7 @@ var LazyList;
             return new LazyZipList(this, other, f, mode);
         }
         /**
-         * Converts the current list based on `f`.
+         * Converts the list based on `f`.
          * @param f A conversion function
          */
         select(f) {
@@ -74,7 +73,7 @@ var LazyList;
             return new LazySelectManyList(this, f);
         }
         /**
-         * Filters the current list based on `f`.
+         * Filters the list based on `f`.
          * @param f A predicate function
          */
         where(f) {
@@ -94,6 +93,20 @@ var LazyList;
          */
         take(n, outer) {
             return new LazyTakeList(this, n, outer);
+        }
+        /**
+         * Groups the list's elements, `n` at a time.
+         * Non lazy by default, but can be made lazy by setting `lazy` as `true`.
+         * If the list is set to lazy you should NEVER calculate the parent iterator before the childrens, like:
+         *
+         *     LazyList.from([1,2,3]).slice(2,false,true).value; // Stops
+         * Additionally a lot of unexpected behaviours could occur.
+         * @param n The length of each slice
+         * @param outer If truthy, every slice will be forced to have `n` elements by concatenating as many `undefined` as needed
+         * @param lazy Indicates if the list should be lazy (and unsafe)
+         */
+        slice(n, outer, lazy) {
+            return new LazySliceList(this, n, outer, lazy);
         }
         /**
          * Groups the list's elements based on a provided function.
@@ -139,12 +152,19 @@ var LazyList;
             return new LazyWrapList(this);
         }
         /**
-         *  Utility function that specifies how two iterables of different lengths should be conbined.
+         * Utility function that specifies how two iterables of different lengths should be conbined.
          * @param other An iterable
          * @param mode Different length handling
          */
         adjust(other, mode) {
             return new LazyZipList(this, other, (a, b) => [a, b], mode);
+        }
+        /**
+         * Executes `f` on each element of the list and returns the current element (not the output of `f`).
+         * @param f A function
+         */
+        but(f) {
+            return new LazySelectList(this, (e, i, data) => (f(e, i, data), e));
         }
         /**
          * Calculates each element of the list and wraps them in another `LazyList`.
@@ -153,7 +173,13 @@ var LazyList;
             return LazyList.from(this.value);
         }
         /**
-         * Aggregates the current list based on `f`.
+         * Calculates and awaits each element of the list and wraps them in another `LazyList`.
+         */
+        async await() {
+            return LazyList.from(await Promise.all(this.value));
+        }
+        /**
+         * Aggregates the list based on `f`.
          * @param f A combination function
          * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration).
          */
@@ -295,7 +321,8 @@ var LazyList;
                 yield* this.data;
         }
         /**
-         * Calculate the base iterable.
+         * Utility function that calculates the base iterable.
+         * If the base iterable is an `Array` it will be returned directly.
          */
         base() {
             return this.data instanceof Array
@@ -427,17 +454,47 @@ var LazyList;
             this.n = n;
             this.outer = outer;
         }
-        *[Symbol.iterator]() {
-            const iter = this.data[Symbol.iterator]();
-            for (var i = 0; i < this.n; i++) {
+        /**
+         * Utility function that takes `n` elements from `iter`.
+         * @param iter The marked iterator
+         * @param n The elements to take
+         * @param outer If truthy and `n` is more than the iterator length, the output will be forced to have length `n` by yielding as many `undefined` as needed
+         */
+        static *take(iter, n, outer = false) {
+            for (var i = 0; i < n; i++) // If this were a foreach loop the first element after `n` would be calculated too
+             {
                 const e = iter.next();
-                if (e.done && !this.outer)
+                if ((iter.done = e.done) && !outer)
                     break;
                 yield e.value;
             }
         }
+        *[Symbol.iterator]() {
+            yield* LazyTakeList.take(this.data[Symbol.iterator](), this.n, this.outer);
+        }
     }
     LazyList_1.LazyTakeList = LazyTakeList;
+    /**
+     * Output of `list.slice()`.
+     */
+    class LazySliceList extends LazyDataList {
+        constructor(data, n, outer = false, lazy = false) {
+            super(data);
+            this.n = n;
+            this.outer = outer;
+            this.lazy = lazy;
+        }
+        *[Symbol.iterator]() {
+            const iter = this.data[Symbol.iterator]();
+            while (!(iter.done ?? false)) {
+                const e = LazyList.from(LazyTakeList.take(iter, this.n, this.outer));
+                yield this.lazy
+                    ? e
+                    : e.calc();
+            }
+        }
+    }
+    LazyList_1.LazySliceList = LazySliceList;
     /**
      * Element of the output of `list.groupBy()`.
      * The group common value is contained in the "key" property.
@@ -477,20 +534,19 @@ var LazyList;
      * Output of `list.sort()`.
      */
     class LazySortList extends LazyDataList {
-        constructor(data, f = (a, b) => a > b ? 1 : a < b ? -1 : 0, desc = false) {
+        constructor(data, f, desc = false) {
             super(data);
             this.f = f;
             this.desc = desc;
         }
         *[Symbol.iterator]() {
-            var _a;
             const map = new Map();
             for (const e of this.data)
-                map.set(e, ((_a = map.get(e)) !== null && _a !== void 0 ? _a : 0) + 1);
+                map.set(e, (map.get(e) ?? 0) + 1);
             while (map.size) {
                 var out, n = 0;
                 for (const e of map)
-                    if (!n || (this.f(e[0], out, -1, this) < 0) !== this.desc)
+                    if (!n || (this.f ? this.f(e[0], out, -1, this) < 0 : e[0] < out) !== this.desc)
                         [out, n] = e;
                 for (var i = 0; i < n; i++)
                     yield out;
@@ -534,11 +590,10 @@ var LazyList;
             this.result = [];
         }
         *[Symbol.iterator]() {
-            var _a;
             for (var i = 0; i < this.result.length; i++)
                 yield this.result[i];
             while (true)
-                if ((this.e = ((_a = this.iter) !== null && _a !== void 0 ? _a : (this.iter = this.data[Symbol.iterator]())).next()).done)
+                if ((this.e = (this.iter ?? (this.iter = this.data[Symbol.iterator]())).next()).done)
                     break;
                 else
                     yield this.result[i++] = this.e.value;
@@ -549,8 +604,7 @@ var LazyList;
                 : super.at(n);
         }
         get count() {
-            var _a;
-            return ((_a = this.e) === null || _a === void 0 ? void 0 : _a.done)
+            return this.e?.done
                 ? this.result.length
                 : super.count;
         }

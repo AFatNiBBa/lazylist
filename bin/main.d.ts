@@ -10,6 +10,13 @@ export declare type UConvert<X, Y, T = Y> = (x: X, i: number, data: Iterable<T>)
  * A function that indicates the "truthyness" of a value.
  */
 export declare type UPredicate<T> = UConvert<T, boolean, T>;
+/**
+ * An iterator that may have a "done" property.
+ * If not present is `false` by default.
+ */
+export declare type UMarkedIterator<T> = Iterator<T> & {
+    done?: boolean;
+};
 declare namespace LazyList {
     /**
      * Indicates how two iterable should be conbined it they have different lengths.
@@ -38,7 +45,7 @@ declare namespace LazyList {
         static range(end?: number, begin?: number, step?: number): LazyRangeList;
         /**
          * Returns a `LazyList` based on an iterable.
-         * If `data` is already a `LazyList`, it gets returned directly.
+         * If `data` is already a `LazyList`, it gets returned directly, otherwise it gets wrapped in a `LazyDataList`.
          * @param data The iterable
          */
         static from<T>(data: Iterable<T>): LazyList<T>;
@@ -55,7 +62,7 @@ declare namespace LazyList {
          */
         zip<T, TResult>(other: Iterable<T>, f: UCombine<O, T, TResult>, mode?: UMode): LazyZipList<O, T, TResult>;
         /**
-         * Converts the current list based on `f`.
+         * Converts the list based on `f`.
          * @param f A conversion function
          */
         select<TResult>(f: UConvert<O, TResult>): LazySelectList<O, TResult>;
@@ -65,7 +72,7 @@ declare namespace LazyList {
          */
         selectMany<TResult>(f?: UConvert<O, Iterable<TResult>, TResult>): LazySelectManyList<O, TResult>;
         /**
-         * Filters the current list based on `f`.
+         * Filters the list based on `f`.
          * @param f A predicate function
          */
         where(f: UPredicate<O>): LazyWhereList<O>;
@@ -80,6 +87,18 @@ declare namespace LazyList {
          * @param outer If truthy and `n` is more than the list length, the output list will be forced to have length `n` by concatenating as many `undefined` as needed
          */
         take(n: number, outer?: UMode | boolean): LazyTakeList<O>;
+        /**
+         * Groups the list's elements, `n` at a time.
+         * Non lazy by default, but can be made lazy by setting `lazy` as `true`.
+         * If the list is set to lazy you should NEVER calculate the parent iterator before the childrens, like:
+         *
+         *     LazyList.from([1,2,3]).slice(2,false,true).value; // Stops
+         * Additionally a lot of unexpected behaviours could occur.
+         * @param n The length of each slice
+         * @param outer If truthy, every slice will be forced to have `n` elements by concatenating as many `undefined` as needed
+         * @param lazy Indicates if the list should be lazy (and unsafe)
+         */
+        slice(n: number, outer?: UMode | boolean, lazy?: boolean): LazySliceList<O>;
         /**
          * Groups the list's elements based on a provided function.
          * Non lazy.
@@ -112,17 +131,26 @@ declare namespace LazyList {
          */
         wrap(): LazyWrapList<this>;
         /**
-         *  Utility function that specifies how two iterables of different lengths should be conbined.
+         * Utility function that specifies how two iterables of different lengths should be conbined.
          * @param other An iterable
          * @param mode Different length handling
          */
         adjust<T>(other: Iterable<T>, mode?: UMode): LazyZipList<O, T, [O, T]>;
         /**
+         * Executes `f` on each element of the list and returns the current element (not the output of `f`).
+         * @param f A function
+         */
+        but(f: UConvert<O, void, O>): LazySelectList<O, O>;
+        /**
          * Calculates each element of the list and wraps them in another `LazyList`.
          */
         calc(): LazyDataList<O, O>;
         /**
-         * Aggregates the current list based on `f`.
+         * Calculates and awaits each element of the list and wraps them in another `LazyList`.
+         */
+        await(): Promise<LazyDataList<O, O>>;
+        /**
+         * Aggregates the list based on `f`.
          * @param f A combination function
          * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration).
          */
@@ -198,7 +226,8 @@ declare namespace LazyList {
         constructor(data: Iterable<I>);
         [Symbol.iterator](): Iterator<O>;
         /**
-         * Calculate the base iterable.
+         * Utility function that calculates the base iterable.
+         * If the base iterable is an `Array` it will be returned directly.
          */
         base(): O[];
         get count(): number;
@@ -261,7 +290,24 @@ declare namespace LazyList {
         n: number;
         outer: UMode | boolean;
         constructor(data: Iterable<T>, n: number, outer?: UMode | boolean);
+        /**
+         * Utility function that takes `n` elements from `iter`.
+         * @param iter The marked iterator
+         * @param n The elements to take
+         * @param outer If truthy and `n` is more than the iterator length, the output will be forced to have length `n` by yielding as many `undefined` as needed
+         */
+        static take<T>(iter: UMarkedIterator<T>, n: number, outer?: UMode | boolean): Generator<any, void, unknown>;
         [Symbol.iterator](): Iterator<T>;
+    }
+    /**
+     * Output of `list.slice()`.
+     */
+    class LazySliceList<T> extends LazyDataList<T, LazyList<T>> {
+        n: number;
+        outer: UMode | boolean;
+        lazy: boolean;
+        constructor(data: Iterable<T>, n: number, outer?: UMode | boolean, lazy?: boolean);
+        [Symbol.iterator](): Iterator<LazyList<T>>;
     }
     /**
      * Element of the output of `list.groupBy()`.
@@ -284,7 +330,7 @@ declare namespace LazyList {
      * Output of `list.sort()`.
      */
     class LazySortList<T> extends LazyDataList<T, T> {
-        f: UCombine<T, T, number, T>;
+        f?: UCombine<T, T, number, T>;
         desc: boolean;
         constructor(data: Iterable<T>, f?: UCombine<T, T, number, T>, desc?: boolean);
         [Symbol.iterator](): Iterator<T>;

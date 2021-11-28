@@ -11,7 +11,7 @@
 		"declaration" : true,
 		"strict": false,
 		"allowJs": true,
-		"target": "ES6",
+		"target": "es2020",
 		"noImplicitUseStrict": true
 	}
 }

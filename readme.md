@@ -48,19 +48,22 @@ For the details look at the JSDocs.
 ### **Lists**
 Methods that generate other `LazyList`s
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries (both the `begin` and `end` boundaries are included); The `count` operation will be calculated on this type of list 
-- (static) **`from`**: Returns a new list that wraps the provided iterable object
+- (static) **`from`**: Returns a new `LazyDataList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`concat`**: Concat the current list to an iterable
 - **`zip`**: Combines the current list to an iterable based on a provided function
-- **`select`**: Converts the current list based on a provided function
+- **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concat the (iterable) outputs of a provided function that will be applied to each element of the list
-- **`where`**: Filters the current list based on a provided function
+- **`where`**: Filters the list based on a provided function
 - **`skip`**: Skips the first `n` elements of the list
 - **`take`**: Takes the first `n` elements of the list and skips the rest
-- (non lazy) **`groupBy`**: Groups the current list's elements based on a provided function
-- (non lazy) **`sort`**: Sorts the current list's elements based on a provided function
-- (non lazy) **`reverse`**: Reverses the current list
-- **`repeat`**: Repeat the current list's elements `n` times
+- (non lazy | unsafe) **`slice`**: Groups the list's elements, `n` at a time; Passing `true` as the `lazy` argument will make the list lazy but unsafe
+- (non lazy) **`groupBy`**: Groups the list's elements based on a provided function
+- (non lazy) **`sort`**: Sorts the list based on a provided function
+- (non lazy) **`reverse`**: Reverses the list
+- **`repeat`**: Repeat the list's elements `n` times
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
 - **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
 - **`adjust`**: Utility function that specifies how two iterables of different lengths should be conbined
+- **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)
 - (non lazy) **`calc`**: Calculates each element of the list and wraps them in another `LazyList`
+- (non lazy) **`await`**: Calculates and awaits each element of the list and wraps them in another `LazyList`
