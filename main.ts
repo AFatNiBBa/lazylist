@@ -223,7 +223,7 @@ namespace LazyList
          * Calculates and awaits each element of the list and wraps them in another `LazyList`.
          */
         async await(): Promise<LazyDataList<O, O>> {
-            return LazyList.from(await Promise.all(this.value)) as LazyDataList<O, O>;
+            return LazyList.from(await Promise.all(this)) as LazyDataList<O, O>;
         }
     
         /**

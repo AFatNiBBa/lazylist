@@ -176,7 +176,7 @@ var LazyList;
          * Calculates and awaits each element of the list and wraps them in another `LazyList`.
          */
         async await() {
-            return LazyList.from(await Promise.all(this.value));
+            return LazyList.from(await Promise.all(this));
         }
         /**
          * Aggregates the list based on `f`.
