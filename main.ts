@@ -244,16 +244,17 @@ namespace LazyList
         /**
          * Returns the element at the provided index.
          * @param n The index
+         * @param def The default value
          */
-        at(n: number): O {
-            return this.skip(n).first();
+        at<T = null>(n: number, def?: T): O | T {
+            return this.skip(n).first(def);
         }
 
         /**
          * Gets the first element of the list or `def` as default if it's empty.
          * @param def The default value
          */
-        first<T>(def: T = null): O | T {
+        first<T = null>(def: T = null): O | T {
             for (const e of this)
                 return e;
             return def;
@@ -263,7 +264,7 @@ namespace LazyList
          * Gets the last element of the list or `def` as default if it's empty.
          * @param def The default value
          */
-        last<T>(out: O | T = null): O | T {
+        last<T = null>(out: O | T = null): O | T {
             for (const e of this)
                 out = e;
             return out;
@@ -524,7 +525,7 @@ namespace LazyList
 
         *[Symbol.iterator](): Iterator<LazyList<T>> {
             const iter: UMarkedIterator<T> = this.data[Symbol.iterator]();
-            while (!(iter.done ?? false))
+            while (!iter.done)
             {
                 const e = LazyList.from(LazyTakeList.take<T>(iter, this.n, this.outer));
                 yield this.lazy
@@ -619,30 +620,31 @@ namespace LazyList
     /**
      * Output of `list.cache()`.
      */
-    export class LazyCacheList<T> extends LazyDataList<T, T> {
-        result: T[] = [];
-        iter: Iterator<T>;
-        e: IteratorResult<T>;
-        constructor(data: Iterable<T>) { super(data); }
+    export class LazyCacheList<O> extends LazyDataList<O, O> {
+        result: O[] = [];
+        iter: UMarkedIterator<O>;
+        constructor(data: Iterable<O>) { super(data); }
 
-        *[Symbol.iterator](): Iterator<T> {
+        *[Symbol.iterator](): Iterator<O> {
             for (var i = 0; i < this.result.length; i++)
                 yield this.result[i];
             while (true)
-                if ((this.e = (this.iter ??= this.data[Symbol.iterator]()).next()).done)
+            {
+                const e = (this.iter ??= this.data[Symbol.iterator]()).next();
+                if (this.iter.done = e.done)
                     break;
-                else 
-                    yield this.result[i++] = this.e.value;
+                yield this.result[i++] = e.value;
+            }
         }
 
-        at(n: number): T {
+        at<T = null>(n: number, def?: T): O | T {
             return n < this.result.length
                 ? this.result[n]
-                : super.at(n);
+                : super.at(n, def);
         }
 
         get count(): number {
-            return this.e?.done
+            return this.iter?.done
                 ? this.result.length
                 : super.count;
         }

@@ -195,9 +195,10 @@ var LazyList;
         /**
          * Returns the element at the provided index.
          * @param n The index
+         * @param def The default value
          */
-        at(n) {
-            return this.skip(n).first();
+        at(n, def) {
+            return this.skip(n).first(def);
         }
         /**
          * Gets the first element of the list or `def` as default if it's empty.
@@ -486,7 +487,7 @@ var LazyList;
         }
         *[Symbol.iterator]() {
             const iter = this.data[Symbol.iterator]();
-            while (!(iter.done ?? false)) {
+            while (!iter.done) {
                 const e = LazyList.from(LazyTakeList.take(iter, this.n, this.outer));
                 yield this.lazy
                     ? e
@@ -592,19 +593,20 @@ var LazyList;
         *[Symbol.iterator]() {
             for (var i = 0; i < this.result.length; i++)
                 yield this.result[i];
-            while (true)
-                if ((this.e = (this.iter ?? (this.iter = this.data[Symbol.iterator]())).next()).done)
+            while (true) {
+                const e = (this.iter ?? (this.iter = this.data[Symbol.iterator]())).next();
+                if (this.iter.done = e.done)
                     break;
-                else
-                    yield this.result[i++] = this.e.value;
+                yield this.result[i++] = e.value;
+            }
         }
-        at(n) {
+        at(n, def) {
             return n < this.result.length
                 ? this.result[n]
-                : super.at(n);
+                : super.at(n, def);
         }
         get count() {
-            return this.e?.done
+            return this.iter?.done
                 ? this.result.length
                 : super.count;
         }

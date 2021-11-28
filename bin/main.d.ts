@@ -158,18 +158,19 @@ declare namespace LazyList {
         /**
          * Returns the element at the provided index.
          * @param n The index
+         * @param def The default value
          */
-        at(n: number): O;
+        at<T = null>(n: number, def?: T): O | T;
         /**
          * Gets the first element of the list or `def` as default if it's empty.
          * @param def The default value
          */
-        first<T>(def?: T): O | T;
+        first<T = null>(def?: T): O | T;
         /**
          * Gets the last element of the list or `def` as default if it's empty.
          * @param def The default value
          */
-        last<T>(out?: O | T): O | T;
+        last<T = null>(out?: O | T): O | T;
         /**
          * Returns `true` if `f` returns `true` for at least one element of the list.
          * @param f A predicate function; It defaults to the identity function
@@ -353,13 +354,12 @@ declare namespace LazyList {
     /**
      * Output of `list.cache()`.
      */
-    class LazyCacheList<T> extends LazyDataList<T, T> {
-        result: T[];
-        iter: Iterator<T>;
-        e: IteratorResult<T>;
-        constructor(data: Iterable<T>);
-        [Symbol.iterator](): Iterator<T>;
-        at(n: number): T;
+    class LazyCacheList<O> extends LazyDataList<O, O> {
+        result: O[];
+        iter: UMarkedIterator<O>;
+        constructor(data: Iterable<O>);
+        [Symbol.iterator](): Iterator<O>;
+        at<T = null>(n: number, def?: T): O | T;
         get count(): number;
     }
     /**
