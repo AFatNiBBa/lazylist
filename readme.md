@@ -58,6 +58,7 @@ Methods that generate other `LazyList`s
 - **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concat the (iterable) outputs of a provided function that will be applied to each element of the list
 - **`where`**: Filters the list based on a provided function
+- **`while`**: Executes the list until the provided function returns `false` for the current element
 - **`skip`**: Skips the first `n` elements of the list
 - **`take`**: Takes the first `n` elements of the list and skips the rest
 - (non lazy | unsafe) **`slice`**: Groups the list's elements, `n` at a time; Passing `true` as the `lazy` argument will make the list lazy but unsafe

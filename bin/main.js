@@ -99,6 +99,13 @@ var LazyList;
             return new LazyWhereList(this, f);
         }
         /**
+         * Executes the list until `f` returns `false` for the current element.
+         * @param f A predicate function
+         */
+        while(f) {
+            return new LazyWhileList(this, f);
+        }
+        /**
          * Skips the first `n` elements of the list.
          * @param n The elements to skip
          */
@@ -501,6 +508,24 @@ var LazyList;
         }
     }
     LazyList_1.LazyWhereList = LazyWhereList;
+    /**
+     * Output of `list.while()`.
+     */
+    class LazyWhileList extends LazyDataList {
+        constructor(data, f) {
+            super(data);
+            this.f = f;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const e of this.data)
+                if (this.f(e, i++, this))
+                    yield e;
+                else
+                    break;
+        }
+    }
+    LazyList_1.LazyWhileList = LazyWhileList;
     /**
      * Output of `list.skip()`.
      */

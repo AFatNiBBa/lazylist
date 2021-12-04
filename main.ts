@@ -133,6 +133,14 @@ namespace LazyList
         where(f: UPredicate<O>): LazyWhereList<O> {
             return new LazyWhereList<O>(this, f);
         }
+
+        /**
+         * Executes the list until `f` returns `false` for the current element.
+         * @param f A predicate function
+         */
+        while(f: UPredicate<O>): LazyWhileList<O> {
+            return new LazyWhileList<O>(this, f);
+        }
     
         /**
          * Skips the first `n` elements of the list.
@@ -547,6 +555,22 @@ namespace LazyList
             for (const e of this.data)
                 if (this.f(e, i++, this))
                     yield e;
+        }
+    }
+
+    /**
+     * Output of `list.while()`.
+     */
+    export class LazyWhileList<T> extends LazyDataList<T, T> {
+        constructor(data: Iterable<T>, public f: UPredicate<T>) { super(data); }
+
+        *[Symbol.iterator](): Iterator<T> {
+            var i = 0;
+            for (const e of this.data)
+                if (this.f(e, i++, this))
+                    yield e;
+                else
+                    break;
         }
     }
 

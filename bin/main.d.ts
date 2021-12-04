@@ -95,6 +95,11 @@ declare namespace LazyList {
          */
         where(f: UPredicate<O>): LazyWhereList<O>;
         /**
+         * Executes the list until `f` returns `false` for the current element.
+         * @param f A predicate function
+         */
+        while(f: UPredicate<O>): LazyWhileList<O>;
+        /**
          * Skips the first `n` elements of the list.
          * @param n The elements to skip
          */
@@ -307,6 +312,14 @@ declare namespace LazyList {
      * Output of `list.where()`.
      */
     class LazyWhereList<T> extends LazyDataList<T, T> {
+        f: UPredicate<T>;
+        constructor(data: Iterable<T>, f: UPredicate<T>);
+        [Symbol.iterator](): Iterator<T>;
+    }
+    /**
+     * Output of `list.while()`.
+     */
+    class LazyWhileList<T> extends LazyDataList<T, T> {
         f: UPredicate<T>;
         constructor(data: Iterable<T>, f: UPredicate<T>);
         [Symbol.iterator](): Iterator<T>;
