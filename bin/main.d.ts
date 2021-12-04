@@ -37,6 +37,11 @@ declare namespace LazyList {
     abstract class LazyList<O> implements Iterable<O> {
         abstract [Symbol.iterator](): Iterator<O>;
         /**
+         * Makes every `Generator` a `LazyList`.
+         * It changes the inheritance chain of the `Generator`.
+         */
+        static attachIterator(): typeof LazyList;
+        /**
          * Returns an auto-generated list of numbers.
          * @param end The end of the sequence
          * @param begin The begin of the sequence
@@ -61,6 +66,19 @@ declare namespace LazyList {
          * @param mode Different length handling
          */
         zip<T, TResult>(other: Iterable<T>, f: UCombine<O, T, TResult>, mode?: UMode): LazyZipList<O, T, TResult>;
+        /**
+         * Joins the current list with `other` based on `f`, where the condition `filter` is met.
+         * If no `filter` argument is supplied, the method multiplies the two lists (And `mode` becomes useless).
+         * If `mode` is not "inner", `null` will be supplied as the missing element.
+         * The index available in the functions is the one of the "left" part in the "inner" operation, and `-1` in the "outer" part.
+         * The "right" part (`other`) will be calculeted one time for each element of the "left" part and must be of the same size each time.
+         * Wrap `other` in a `LazyCacheList` (Or use the `list.cache()` method) to cache the elements.
+         * @param other An iterable
+         * @param filter A filter function
+         * @param f A combination function
+         * @param mode Different length handling
+         */
+        join<T, TResult>(other: Iterable<T>, f: UCombine<O, T, TResult>, filter?: UCombine<O, T, boolean, TResult>, mode?: UMode): LazyJoinList<O, T, TResult>;
         /**
          * Converts the list based on `f`.
          * @param f A conversion function
@@ -172,15 +190,20 @@ declare namespace LazyList {
          */
         last<T = null>(out?: O | T): O | T;
         /**
+         * Returns `true` if `f` returns `true` for every element of the list.
+         * @param f A predicate function; It defaults to the identity function
+         */
+        all(f?: UPredicate<O>): boolean;
+        /**
          * Returns `true` if `f` returns `true` for at least one element of the list.
          * @param f A predicate function; It defaults to the identity function
          */
         any(f?: UPredicate<O>): boolean;
         /**
-         * Returns `true` if `f` returns `true` for every element of the list.
-         * @param f A predicate function; It defaults to the identity function
+         * Returns `true` if a value is in the list.
+         * @param v The value
          */
-        all(f?: UPredicate<O>): boolean;
+        has(v: O): boolean;
         /**
          * Calculates each element of the list and puts them inside of an `Array`.
          */
@@ -215,6 +238,7 @@ declare namespace LazyList {
         step: number;
         constructor(end?: number, begin?: number, step?: number);
         [Symbol.iterator](): Iterator<number>;
+        has(v: number): boolean;
         get count(): number;
     }
     /**
@@ -250,6 +274,17 @@ declare namespace LazyList {
         f: UCombine<A, B, TResult>;
         mode: UMode;
         constructor(data: Iterable<A>, other: Iterable<B>, f: UCombine<A, B, TResult>, mode?: UMode);
+        [Symbol.iterator](): Iterator<TResult>;
+    }
+    /**
+     * Output of `list.join()`.
+     */
+    class LazyJoinList<A, B, TResult> extends LazyDataList<A, TResult> {
+        other: Iterable<B>;
+        f: UCombine<A, B, TResult>;
+        filter?: UCombine<A, B, boolean, TResult>;
+        mode: UMode;
+        constructor(data: Iterable<A>, other: Iterable<B>, f: UCombine<A, B, TResult>, filter?: UCombine<A, B, boolean, TResult>, mode?: UMode);
         [Symbol.iterator](): Iterator<TResult>;
     }
     /**
@@ -369,10 +404,11 @@ declare namespace LazyList {
         data: T;
         constructor(data: T);
         [Symbol.iterator](): Generator<T, void, unknown>;
-        get value(): T[];
-        get count(): number;
         first(): T;
         last(): T;
+        has(v: T): boolean;
+        get value(): T[];
+        get count(): number;
     }
 }
 declare const _default: typeof LazyList.LazyList & typeof LazyList;

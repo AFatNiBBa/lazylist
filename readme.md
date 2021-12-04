@@ -36,8 +36,9 @@ For the details look at the JSDocs.
 - **`at`**: Returns the element at the provided index
 - **`first`**: Gets the first element of the list or the provided value as default if it's empty
 - **`last`**: Gets the last element of the list or the provided value as default if it's empty
-- **`any`**: Returns `true` if the provided predicate returns `true` for at least one element of the list
 - **`all`**: Returns `true` if the provided predicate returns `true` for every element of the list
+- **`any`**: Returns `true` if the provided predicate returns `true` for at least one element of the list
+- **`has`**: Returns `true` if a value is in the list
 - (getter) **`value`**: Calculates each element of the list and puts them inside of an `Array`
 - (getter) **`count`**: Calculates the length of the list
 - (getter) **`avg`**: Calculates the average of the elements of the list
@@ -47,10 +48,12 @@ For the details look at the JSDocs.
 
 ### **Lists**
 Methods that generate other `LazyList`s
+- (static & hack) **`attachIterator`**: Makes every `Generator` a `LazyList` and returns the module for chaining
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries (both the `begin` and `end` boundaries are included); The `count` operation will be calculated on this type of list 
 - (static) **`from`**: Returns a new `LazyDataList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`concat`**: Concat the current list to an iterable
 - **`zip`**: Combines the current list to an iterable based on a provided function
+- **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
 - **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concat the (iterable) outputs of a provided function that will be applied to each element of the list
 - **`where`**: Filters the list based on a provided function

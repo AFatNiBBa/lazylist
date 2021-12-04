@@ -1,8 +1,3 @@
-/*
-    [MAY]: fix `new LazyRangeList().count`
-    [WIP]: `join()`
-        [WIP]: outer, inner, left, right
-*/
 var LazyList;
 (function (LazyList_1) {
     /**
@@ -23,6 +18,15 @@ var LazyList;
      * An iterable wrapper with helper functions.
      */
     class LazyList {
+        /**
+         * Makes every `Generator` a `LazyList`.
+         * It changes the inheritance chain of the `Generator`.
+         */
+        static attachIterator() {
+            //@ts-ignore
+            (function* () { })().__proto__.__proto__.__proto__.__proto__ = LazyList.prototype;
+            return LazyList;
+        }
         /**
          * Returns an auto-generated list of numbers.
          * @param end The end of the sequence
@@ -57,6 +61,21 @@ var LazyList;
          */
         zip(other, f, mode) {
             return new LazyZipList(this, other, f, mode);
+        }
+        /**
+         * Joins the current list with `other` based on `f`, where the condition `filter` is met.
+         * If no `filter` argument is supplied, the method multiplies the two lists (And `mode` becomes useless).
+         * If `mode` is not "inner", `null` will be supplied as the missing element.
+         * The index available in the functions is the one of the "left" part in the "inner" operation, and `-1` in the "outer" part.
+         * The "right" part (`other`) will be calculeted one time for each element of the "left" part and must be of the same size each time.
+         * Wrap `other` in a `LazyCacheList` (Or use the `list.cache()` method) to cache the elements.
+         * @param other An iterable
+         * @param filter A filter function
+         * @param f A combination function
+         * @param mode Different length handling
+         */
+        join(other, f, filter, mode) {
+            return new LazyJoinList(this, other, f, filter, mode);
         }
         /**
          * Converts the list based on `f`.
@@ -219,6 +238,17 @@ var LazyList;
             return out;
         }
         /**
+         * Returns `true` if `f` returns `true` for every element of the list.
+         * @param f A predicate function; It defaults to the identity function
+         */
+        all(f) {
+            var i = 0;
+            for (const e of this)
+                if (!(f ? f(e, i++, this) : e))
+                    return false;
+            return true;
+        }
+        /**
          * Returns `true` if `f` returns `true` for at least one element of the list.
          * @param f A predicate function; It defaults to the identity function
          */
@@ -230,15 +260,11 @@ var LazyList;
             return false;
         }
         /**
-         * Returns `true` if `f` returns `true` for every element of the list.
-         * @param f A predicate function; It defaults to the identity function
+         * Returns `true` if a value is in the list.
+         * @param v The value
          */
-        all(f) {
-            var i = 0;
-            for (const e of this)
-                if (!(f ? f(e, i++, this) : e))
-                    return false;
-            return true;
+        has(v) {
+            return this.any(x => Object.is(x, v));
         }
         /**
          * Calculates each element of the list and puts them inside of an `Array`.
@@ -297,13 +323,16 @@ var LazyList;
             this.step = step;
         }
         *[Symbol.iterator]() {
-            for (var i = this.begin; i == this.end || (i < this.end) !== (this.step < 0); i = (i + this.step) || 0)
+            for (var i = this.begin; this.has(i); i = (i + this.step) || 0)
                 yield i;
         }
+        has(v) {
+            return v == this.end || (v < this.end) !== (this.step < 0);
+        }
         get count() {
-            return this.take(2).aggregate(Object.is)
-                ? Infinity
-                : Math.max(0, Math.floor((this.end - this.begin) / this.step) + 1) || 0;
+            return this.step
+                ? (Math.max(0, Math.floor((this.end - this.begin) / this.step)) || 0) + +this.has(this.begin)
+                : Infinity;
         }
     }
     LazyList_1.LazyRangeList = LazyRangeList;
@@ -382,6 +411,48 @@ var LazyList;
         }
     }
     LazyList_1.LazyZipList = LazyZipList;
+    /**
+     * Output of `list.join()`.
+     */
+    class LazyJoinList extends LazyDataList {
+        constructor(data, other, f, filter, mode = UMode.inner) {
+            super(data);
+            this.other = other;
+            this.f = f;
+            this.filter = filter;
+            this.mode = mode;
+        }
+        *[Symbol.iterator]() {
+            const aCache = [];
+            const bCache = [];
+            // [ Inner ]
+            var i = 0;
+            for (const a of this.data) {
+                var k = 0;
+                const aE = aCache[i] ?? (aCache[i] = { v: a });
+                for (const b of this.other) {
+                    const bE = bCache[k] ?? (bCache[k] = { v: b });
+                    const temp = !this.filter || this.filter(a, b, i, this);
+                    aE.c || (aE.c = temp);
+                    bE.c || (bE.c = temp);
+                    if (temp)
+                        yield this.f(a, b, i, this);
+                    k++;
+                }
+                i++;
+            }
+            // [ Outer ]
+            if (this.mode & UMode.left)
+                for (const e of aCache)
+                    if (!e.c)
+                        yield this.f(e.v, null, -1, this);
+            if (this.mode & UMode.right)
+                for (const e of bCache)
+                    if (!e.c)
+                        yield this.f(null, e.v, -1, this);
+        }
+    }
+    LazyList_1.LazyJoinList = LazyJoinList;
     /**
      * Output of `list.select()`.
      */
@@ -621,10 +692,11 @@ var LazyList;
             this.data = data;
         }
         *[Symbol.iterator]() { yield this.data; }
-        get value() { return [this.data]; }
-        get count() { return 1; }
         first() { return this.data; }
         last() { return this.data; }
+        has(v) { return this.data === v; }
+        get value() { return [this.data]; }
+        get count() { return 1; }
     }
     LazyList_1.LazyWrapList = LazyWrapList;
 })(LazyList || (LazyList = {}));
