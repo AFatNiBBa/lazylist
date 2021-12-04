@@ -64,7 +64,7 @@ var LazyList;
         }
         /**
          * Joins the current list with `other` based on `f`, where the condition `filter` is met.
-         * If no `filter` argument is supplied, the method multiplies the two lists (And `mode` becomes useless).
+         * If no `filter` argument is supplied, the method does the cartesian product of the two lists (And `mode` becomes useless).
          * If `mode` is not "inner", `null` will be supplied as the missing element.
          * The index available in the functions is the one of the "left" part in the "inner" operation, and `-1` in the "outer" part.
          * The "right" part (`other`) will be calculeted one time for each element of the "left" part and must be of the same size each time.
