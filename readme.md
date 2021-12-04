@@ -20,7 +20,8 @@ const LazyList = require("lazylist.js");
 const { LazyList } = require("lazylist.js");
 ```
 Simply pass an iterable object to the static method `LazyList.from()` to create a `LazyList`.
-> Note that if the iterable object is the result of a generator function you will be able to iterate over it only one time
+> Note that if the iterable object is the result of a generator function you will be able to iterate over it only one time. <br>
+Call the `cache()` method on the list to fix this issue.
 ```js
 var i = 0;
 const list = LazyList.from([ 1, 2, 3 ]).select(x => (i++) + x);
@@ -70,3 +71,20 @@ Methods that generate other `LazyList`s
 - **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)
 - (non lazy) **`calc`**: Calculates each element of the list and wraps them in another `LazyList`
 - (non lazy) **`await`**: Calculates and awaits each element of the list and wraps them in another `LazyList`
+
+## Generators as lazy lists
+Executing this method, will make every generator have the `LazyList`'s methods
+```js
+require("lazylist.js").attachIterator();
+const a = [ 1, 2, 3 ][Symbol.iterator]().where(x => x < 3).select(x => x * 2);
+console.log(a.value); //=> [ 2, 4 ]
+console.log(a.value); //=> []
+```
+Remember that generators can be iterated only one time (That's the reason why `a.value` returned an empty list the second time). <br>
+To fix this problem, just call the `cache()` method on the generator like so:
+```js
+require("lazylist.js").attachIterator();
+const a = [ 1, 2, 3 ][Symbol.iterator]().cache().where(x => x < 3).select(x => x * 2);
+console.log(a.value); //=> [ 2, 4 ]
+console.log(a.value); //=> [ 2, 4 ]
+```
