@@ -426,18 +426,18 @@ namespace LazyList
                 : Array.from(this.data);
         }
 
-        get count() {
-            return this.data instanceof Array
-                ? this.data.length
-                : super.count;
-        }
-
         last<T>(def: T = null): O | T {
             return this.data instanceof Array
                 ? this.data.length > 0
                     ? this.data[this.data.length - 1]
                     : def
                 : super.last(def);
+        }
+
+        get count() {
+            return this.data instanceof Array
+                ? this.data.length
+                : super.count;
         }
     }
 
@@ -739,6 +739,12 @@ namespace LazyList
             return n < this.result.length
                 ? this.result[n]
                 : super.at(n, def);
+        }
+
+        last<T = null>(def: O | T = null): O | T {
+            return this.iter?.done
+                ? this.result[this.result.length - 1]
+                : super.last(def);
         }
 
         get count(): number {

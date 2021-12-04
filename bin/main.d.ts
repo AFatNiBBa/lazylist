@@ -260,8 +260,8 @@ declare namespace LazyList {
          * If the base iterable is an `Array` it will be returned directly.
          */
         base(): O[];
-        get count(): number;
         last<T>(def?: T): O | T;
+        get count(): number;
     }
     /**
      * Output of `list.concat()`.
@@ -408,6 +408,7 @@ declare namespace LazyList {
         constructor(data: Iterable<O>);
         [Symbol.iterator](): Iterator<O>;
         at<T = null>(n: number, def?: T): O | T;
+        last<T = null>(def?: O | T): O | T;
         get count(): number;
     }
     /**
