@@ -77,11 +77,11 @@ namespace LazyList
         }
     
         /**
-         * Concats the current list to `other`.
+         * Merges the current list to `other`.
          * @param other An iterable
          */
-        concat(other: Iterable<O>): LazyConcatList<O> {
-            return new LazyConcatList<O>(this, other);
+        merge(other: Iterable<O>): LazyMergeList<O> {
+            return new LazyMergeList<O>(this, other);
         }
     
         /**
@@ -119,11 +119,20 @@ namespace LazyList
         }
     
         /**
-         * Converts the current list to an iterables list based on `f` and concat every element.
+         * Converts the current list to an iterables list based on `f` and concats every element.
          * @param f A conversion function; Can be omitted if every element is iterable
          */
         selectMany<TResult>(f?: UConvert<O, Iterable<TResult>, TResult>): LazySelectManyList<O, TResult> {
             return new LazySelectManyList<O, TResult>(this, f);
+        }
+
+        /**
+         * If `p` matches on an element, it gets converted by `f`.
+         * @param p A predicate function
+         * @param f A conversion function
+         */
+        when(p: UPredicate<O>, f: UConvert<O, O>): LazyWhenList<O> {
+            return new LazyWhenList<O>(this, p, f);
         }
     
         /**
@@ -224,15 +233,6 @@ namespace LazyList
         }
 
         /**
-         * Utility function that specifies how two iterables of different lengths should be conbined.
-         * @param other An iterable
-         * @param mode Different length handling
-         */
-        adjust<T>(other: Iterable<T>, mode?: UMode): LazyZipList<O, T, [ O, T ]> {
-            return new LazyZipList<O, T, [ O, T ]>(this, other, (a, b) => [ a, b ], mode);
-        }
-
-        /**
          * Executes `f` on each element of the list and returns the current element (not the output of `f`).
          * @param f A function
          */
@@ -241,17 +241,33 @@ namespace LazyList
         }
 
         /**
+         * Executes `Object.assign()` on each element passing `obj` as the second parameter.
+         * @param obj An object
+         */
+        assign<T>(obj: T): LazySelectList<O, O & T> {
+            return new LazySelectList<O, O & T>(this, x => Object.assign(x, obj));
+        }
+
+        /**
+         * Filters the list returning only the elements which are instances of `f`.
+         * @param f A constructor
+         */
+        ofType<T extends O>(f: new (...args: any[]) => T): LazyWhereList<T> {
+            return new LazyWhereList<O>(this, x => x instanceof f) as LazyWhereList<T>;
+        }
+
+        /**
          * Calculates each element of the list and wraps them in another `LazyList`.
          */
         calc(): LazyDataList<O, O> {
-            return LazyList.from(this.value) as LazyDataList<O, O>;
+            return new LazyDataList<O, O>(this.value);
         }
 
         /**
          * Calculates and awaits each element of the list and wraps them in another `LazyList`.
          */
         async await(): Promise<LazyDataList<O, O>> {
-            return LazyList.from(await Promise.all(this)) as LazyDataList<O, O>;
+            return new LazyDataList<O, O>(await Promise.all(this));
         }
     
         /**
@@ -328,6 +344,14 @@ namespace LazyList
          */
         has(v: O): boolean {
             return this.any(x => Object.is(x, v));
+        }
+
+        /**
+         * Joins the list elements using `sep` as the separator.
+         * @param sep The separator
+         */
+        concat(sep: string = ""): string {
+            return this.aggregate((a, b) => a + sep + b);
         }
     
         /**
@@ -442,9 +466,9 @@ namespace LazyList
     }
 
     /**
-     * Output of `list.concat()`.
+     * Output of `list.merge()`.
      */
-    export class LazyConcatList<T> extends LazyDataList<T, T> {
+    export class LazyMergeList<T> extends LazyDataList<T, T> {
         constructor(data: Iterable<T>, public other: Iterable<T>) { super(data); }
 
         *[Symbol.iterator](): Iterator<T> {
@@ -545,6 +569,24 @@ namespace LazyList
     }
 
     /**
+     * Output of `list.when()`.
+     */
+    export class LazyWhenList<T> extends LazyDataList<T, T> {
+        constructor(data: Iterable<T>, public p: UPredicate<T>, public f: UConvert<T, T>) { super(data); }
+
+        *[Symbol.iterator](): Iterator<T> {
+            var i = 0;
+            for (const e of this.data)
+            {
+                yield this.p(e, i, this)
+                    ? this.f(e, i, this)
+                    : e;
+                i++;
+            }
+        }
+    }
+
+    /**
      * Output of `list.where()`.
      */
     export class LazyWhereList<T> extends LazyDataList<T, T> {
@@ -610,8 +652,8 @@ namespace LazyList
             }
         }
 
-        *[Symbol.iterator](): Iterator<T> {
-            yield* LazyTakeList.take<T>(this.data[Symbol.iterator](), this.n, this.outer);
+        [Symbol.iterator](): Iterator<T> {
+            return LazyTakeList.take<T>(this.data[Symbol.iterator](), this.n, this.outer);
         }
     }
 
@@ -622,10 +664,10 @@ namespace LazyList
         constructor(data: Iterable<T>, public n: number, public outer: UMode | boolean = false, public lazy: boolean = false) { super(data); }
 
         *[Symbol.iterator](): Iterator<LazyList<T>> {
-            const iter: UMarkedIterator<T> = this.data[Symbol.iterator]();
+            const iter: UMarkedIterator<T> = this.data[Symbol.iterator]();                  // The same iterator is used to exclude previous outputs
             while (!iter.done)
             {
-                const e = LazyList.from(LazyTakeList.take<T>(iter, this.n, this.outer));
+                const e = LazyList.from(LazyTakeList.take<T>(iter, this.n, this.outer));    // This doesn't use the normal `list.take()` because I would have reconverted `iter` into an iterable
                 yield this.lazy
                     ? e
                     : e.calc();

@@ -40,6 +40,7 @@ For the details look at the JSDocs.
 - **`all`**: Returns `true` if the provided predicate returns `true` for every element of the list
 - **`any`**: Returns `true` if the provided predicate returns `true` for at least one element of the list
 - **`has`**: Returns `true` if a value is in the list
+- **`concat`**: Joins the list elements using the given separator
 - (getter) **`value`**: Calculates each element of the list and puts them inside of an `Array`
 - (getter) **`count`**: Calculates the length of the list
 - (getter) **`avg`**: Calculates the average of the elements of the list
@@ -52,11 +53,12 @@ Methods that generate other `LazyList`s
 - (static & hack) **`attachIterator`**: Makes every `Generator` a `LazyList` and returns the module for chaining
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries (both the `begin` and `end` boundaries are included); The `count` operation will be calculated on this type of list 
 - (static) **`from`**: Returns a new `LazyDataList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
-- **`concat`**: Concat the current list to an iterable
+- **`merge`**: Concats the current list to an iterable
 - **`zip`**: Combines the current list to an iterable based on a provided function
 - **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
 - **`select`**: Converts the list based on a provided function
-- **`selectMany`**: Concat the (iterable) outputs of a provided function that will be applied to each element of the list
+- **`selectMany`**: Concats the (iterable) outputs of a provided function that will be applied to each element of the list
+- **`when`**: If a given predicate matches on an element, it gets converted by a convertion function
 - **`where`**: Filters the list based on a provided function
 - **`while`**: Executes the list until the provided function returns `false` for the current element
 - **`skip`**: Skips the first `n` elements of the list
@@ -68,8 +70,9 @@ Methods that generate other `LazyList`s
 - **`repeat`**: Repeat the list's elements `n` times
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
 - **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
-- **`adjust`**: Utility function that specifies how two iterables of different lengths should be conbined
 - **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)
+- **`assign`**: Executes `Object.assign()` on each element passing the given object as the second parameter
+- **`ofType`**: Filters the list returning only the elements which are instances of the given constructor
 - (non lazy) **`calc`**: Calculates each element of the list and wraps them in another `LazyList`
 - (non lazy) **`await`**: Calculates and awaits each element of the list and wraps them in another `LazyList`
 
