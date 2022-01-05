@@ -61,8 +61,8 @@ Methods that generate other `LazyList`s
 - **`when`**: If a given predicate matches on an element, it gets converted by a convertion function
 - **`where`**: Filters the list based on a provided function
 - **`while`**: Executes the list until the provided function returns `false` for the current element
-- **`skip`**: Skips the first `n` elements of the list
-- **`take`**: Takes the first `n` elements of the list and skips the rest
+- (non lazy?) **`skip`**: Skips the first `n` elements of the list (If `n` is negative, it skips from the end but is not lazy)
+- (non lazy?) **`take`**: Takes only the first `n` elements of the list (If `n` is negative, it takes from the end but is not lazy)
 - (non lazy | unsafe) **`slice`**: Groups the list's elements, `n` at a time; Passing `true` as the `lazy` argument will make the list lazy but unsafe
 - (non lazy) **`groupBy`**: Groups the list's elements based on a provided function
 - (non lazy) **`sort`**: Sorts the list based on a provided function

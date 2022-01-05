@@ -153,7 +153,7 @@ namespace LazyList
     
         /**
          * Skips the first `n` elements of the list.
-         * @param n The elements to skip
+         * @param n The elements to skip (Use a negative number to skip from the end)
          */
         skip(n: number): LazySkipList<O> {
             return new LazySkipList<O>(this, n);
@@ -161,7 +161,7 @@ namespace LazyList
     
         /**
          * Takes the first `n` elements of the list and skips the rest.
-         * @param n The elements to take
+         * @param n The elements to take (Use a negative number to take from the end)
          * @param outer If truthy and `n` is more than the list length, the output list will be forced to have length `n` by concatenating as many `undefined` as needed
          */
         take(n: number, outer?: UMode | boolean): LazyTakeList<O> {
@@ -622,11 +622,24 @@ namespace LazyList
     export class LazySkipList<T> extends LazyDataList<T, T> {
         constructor(data: Iterable<T>, public n: number) { super(data); }
 
-        *[Symbol.iterator](): Iterator<T> {
+        /**
+         * Utility function that skips `n` elements from `data`.
+         * @param data An iterable
+         * @param n The elements to skip
+         */
+        static *skip<T>(data: Iterable<T>, n: number): Iterator<T> {
             var i = 0;
-            for (const e of this.data)
-                if (++i > this.n)
+            for (const e of data)
+                if (++i > n)
                     yield e;
+        }
+
+        [Symbol.iterator](): Iterator<T> {
+            if (this.n >= 0)
+                return LazySkipList.skip<T>(this.data, this.n);
+
+            const temp = this.base();
+            return LazyTakeList.take<T>(temp[Symbol.iterator](), temp.length + this.n);
         }
     }
 
@@ -638,11 +651,11 @@ namespace LazyList
 
         /**
          * Utility function that takes `n` elements from `iter`.
-         * @param iter The marked iterator
+         * @param iter A marked iterator
          * @param n The elements to take
          * @param outer If truthy and `n` is more than the iterator length, the output will be forced to have length `n` by yielding as many `undefined` as needed
          */
-        static *take<T>(iter: UMarkedIterator<T>, n: number, outer: UMode | boolean = false) {
+        static *take<T>(iter: UMarkedIterator<T>, n: number, outer: UMode | boolean = false) : Iterator<T> {
             for (var i = 0; i < n; i++) // If this were a foreach loop the first element after `n` would be calculated too
             {
                 const e = iter.next();
@@ -653,7 +666,11 @@ namespace LazyList
         }
 
         [Symbol.iterator](): Iterator<T> {
-            return LazyTakeList.take<T>(this.data[Symbol.iterator](), this.n, this.outer);
+            if (this.n >= 0)
+                return LazyTakeList.take<T>(this.data[Symbol.iterator](), this.n, this.outer);
+
+            const temp = this.base();
+            return LazySkipList.skip(temp, temp.length + this.n);
         }
     }
 
@@ -664,10 +681,10 @@ namespace LazyList
         constructor(data: Iterable<T>, public n: number, public outer: UMode | boolean = false, public lazy: boolean = false) { super(data); }
 
         *[Symbol.iterator](): Iterator<LazyList<T>> {
-            const iter: UMarkedIterator<T> = this.data[Symbol.iterator]();                  // The same iterator is used to exclude previous outputs
+            const iter: UMarkedIterator<T> = this.data[Symbol.iterator]();                                         // The same iterator is used to exclude previous outputs
             while (!iter.done)
             {
-                const e = LazyList.from(LazyTakeList.take<T>(iter, this.n, this.outer));    // This doesn't use the normal `list.take()` because I would have reconverted `iter` into an iterable
+                const e = LazyList.from<T>(LazyTakeList.take<T>(iter, this.n, this.outer) as any as Iterable<T>);  // This doesn't use the normal `list.take()` because I would have reconverted `iter` into an iterable
                 yield this.lazy
                     ? e
                     : e.calc();

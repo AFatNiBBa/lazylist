@@ -115,14 +115,14 @@ var LazyList;
         }
         /**
          * Skips the first `n` elements of the list.
-         * @param n The elements to skip
+         * @param n The elements to skip (Use a negative number to skip from the end)
          */
         skip(n) {
             return new LazySkipList(this, n);
         }
         /**
          * Takes the first `n` elements of the list and skips the rest.
-         * @param n The elements to take
+         * @param n The elements to take (Use a negative number to take from the end)
          * @param outer If truthy and `n` is more than the list length, the output list will be forced to have length `n` by concatenating as many `undefined` as needed
          */
         take(n, outer) {
@@ -575,11 +575,22 @@ var LazyList;
             super(data);
             this.n = n;
         }
-        *[Symbol.iterator]() {
+        /**
+         * Utility function that skips `n` elements from `data`.
+         * @param data An iterable
+         * @param n The elements to skip
+         */
+        static *skip(data, n) {
             var i = 0;
-            for (const e of this.data)
-                if (++i > this.n)
+            for (const e of data)
+                if (++i > n)
                     yield e;
+        }
+        [Symbol.iterator]() {
+            if (this.n >= 0)
+                return LazySkipList.skip(this.data, this.n);
+            const temp = this.base();
+            return LazyTakeList.take(temp[Symbol.iterator](), temp.length + this.n);
         }
     }
     LazyList_1.LazySkipList = LazySkipList;
@@ -594,7 +605,7 @@ var LazyList;
         }
         /**
          * Utility function that takes `n` elements from `iter`.
-         * @param iter The marked iterator
+         * @param iter A marked iterator
          * @param n The elements to take
          * @param outer If truthy and `n` is more than the iterator length, the output will be forced to have length `n` by yielding as many `undefined` as needed
          */
@@ -608,7 +619,10 @@ var LazyList;
             }
         }
         [Symbol.iterator]() {
-            return LazyTakeList.take(this.data[Symbol.iterator](), this.n, this.outer);
+            if (this.n >= 0)
+                return LazyTakeList.take(this.data[Symbol.iterator](), this.n, this.outer);
+            const temp = this.base();
+            return LazySkipList.skip(temp, temp.length + this.n);
         }
     }
     LazyList_1.LazyTakeList = LazyTakeList;

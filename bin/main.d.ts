@@ -107,12 +107,12 @@ declare namespace LazyList {
         while(f: UPredicate<O>): LazyWhileList<O>;
         /**
          * Skips the first `n` elements of the list.
-         * @param n The elements to skip
+         * @param n The elements to skip (Use a negative number to skip from the end)
          */
         skip(n: number): LazySkipList<O>;
         /**
          * Takes the first `n` elements of the list and skips the rest.
-         * @param n The elements to take
+         * @param n The elements to take (Use a negative number to take from the end)
          * @param outer If truthy and `n` is more than the list length, the output list will be forced to have length `n` by concatenating as many `undefined` as needed
          */
         take(n: number, outer?: UMode | boolean): LazyTakeList<O>;
@@ -354,6 +354,12 @@ declare namespace LazyList {
     class LazySkipList<T> extends LazyDataList<T, T> {
         n: number;
         constructor(data: Iterable<T>, n: number);
+        /**
+         * Utility function that skips `n` elements from `data`.
+         * @param data An iterable
+         * @param n The elements to skip
+         */
+        static skip<T>(data: Iterable<T>, n: number): Iterator<T>;
         [Symbol.iterator](): Iterator<T>;
     }
     /**
@@ -365,11 +371,11 @@ declare namespace LazyList {
         constructor(data: Iterable<T>, n: number, outer?: UMode | boolean);
         /**
          * Utility function that takes `n` elements from `iter`.
-         * @param iter The marked iterator
+         * @param iter A marked iterator
          * @param n The elements to take
          * @param outer If truthy and `n` is more than the iterator length, the output will be forced to have length `n` by yielding as many `undefined` as needed
          */
-        static take<T>(iter: UMarkedIterator<T>, n: number, outer?: UMode | boolean): Generator<any, void, unknown>;
+        static take<T>(iter: UMarkedIterator<T>, n: number, outer?: UMode | boolean): Iterator<T>;
         [Symbol.iterator](): Iterator<T>;
     }
     /**
