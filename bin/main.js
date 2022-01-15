@@ -92,23 +92,24 @@ var LazyList;
             return new LazySelectManyList(this, f);
         }
         /**
-         * If `p` matches on an element, it gets converted by `f`.
-         * @param p A predicate function
-         * @param f A conversion function
+         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
+         * @param $if A predicate function
+         * @param $then A conversion function
+         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
          */
-        when(p, f) {
-            return new LazyWhenList(this, p, f);
+        when($if, $then, $else) {
+            return new LazyWhenList(this, $if, $then, $else);
         }
         /**
          * Filters the list based on `f`.
-         * @param f A predicate function
+         * @param f A predicate function; If no function is given, falsy elements will be filtered out
          */
         where(f) {
             return new LazyWhereList(this, f);
         }
         /**
          * Executes the list until `f` returns `false` for the current element.
-         * @param f A predicate function
+         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
          */
         while(f) {
             return new LazyWhileList(this, f);
@@ -231,6 +232,19 @@ var LazyList;
                     : f(out, e, i, this),
                     i++;
             return out;
+        }
+        /**
+         * Returns the index of "obj" in the list if found, -1 otherwise.
+         * @param value The value to search inside the list
+         */
+        indexOf(value) {
+            var i = 0;
+            for (const e of this)
+                if (e === value)
+                    return i;
+                else
+                    i++;
+            return -1;
         }
         /**
          * Returns the element at the provided index.
@@ -517,17 +531,20 @@ var LazyList;
      * Output of `list.when()`.
      */
     class LazyWhenList extends LazyDataList {
-        constructor(data, p, f) {
+        constructor(data, $if, $then, $else) {
             super(data);
-            this.p = p;
-            this.f = f;
+            this.$if = $if;
+            this.$then = $then;
+            this.$else = $else;
         }
         *[Symbol.iterator]() {
             var i = 0;
             for (const e of this.data) {
-                yield this.p(e, i, this)
-                    ? this.f(e, i, this)
-                    : e;
+                yield this.$if(e, i, this)
+                    ? this.$then(e, i, this)
+                    : this.$else
+                        ? this.$else(e, i, this)
+                        : e;
                 i++;
             }
         }
@@ -544,7 +561,7 @@ var LazyList;
         *[Symbol.iterator]() {
             var i = 0;
             for (const e of this.data)
-                if (this.f(e, i++, this))
+                if (this.f ? this.f(e, i++, this) : e)
                     yield e;
         }
     }
@@ -560,7 +577,7 @@ var LazyList;
         *[Symbol.iterator]() {
             var i = 0;
             for (const e of this.data)
-                if (this.f(e, i++, this))
+                if (this.f ? this.f(e, i++, this) : e)
                     yield e;
                 else
                     break;

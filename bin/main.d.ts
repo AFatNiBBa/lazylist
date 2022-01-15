@@ -90,21 +90,22 @@ declare namespace LazyList {
          */
         selectMany<TResult>(f?: UConvert<O, Iterable<TResult>, TResult>): LazySelectManyList<O, TResult>;
         /**
-         * If `p` matches on an element, it gets converted by `f`.
-         * @param p A predicate function
-         * @param f A conversion function
+         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
+         * @param $if A predicate function
+         * @param $then A conversion function
+         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
          */
-        when(p: UPredicate<O>, f: UConvert<O, O>): LazyWhenList<O>;
+        when($if: UPredicate<O>, $then: UConvert<O, O>, $else?: UConvert<O, O>): LazyWhenList<O>;
         /**
          * Filters the list based on `f`.
-         * @param f A predicate function
+         * @param f A predicate function; If no function is given, falsy elements will be filtered out
          */
-        where(f: UPredicate<O>): LazyWhereList<O>;
+        where(f?: UPredicate<O>): LazyWhereList<O>;
         /**
          * Executes the list until `f` returns `false` for the current element.
-         * @param f A predicate function
+         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
          */
-        while(f: UPredicate<O>): LazyWhileList<O>;
+        while(f?: UPredicate<O>): LazyWhileList<O>;
         /**
          * Skips the first `n` elements of the list.
          * @param n The elements to skip (Use a negative number to skip from the end)
@@ -188,6 +189,11 @@ declare namespace LazyList {
          * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration).
          */
         aggregate<TResult = O>(f: UCombine<TResult, O, TResult, O>, out?: TResult): TResult;
+        /**
+         * Returns the index of "obj" in the list if found, -1 otherwise.
+         * @param value The value to search inside the list
+         */
+        indexOf(value: O): number;
         /**
          * Returns the element at the provided index.
          * @param n The index
@@ -327,25 +333,26 @@ declare namespace LazyList {
      * Output of `list.when()`.
      */
     class LazyWhenList<T> extends LazyDataList<T, T> {
-        p: UPredicate<T>;
-        f: UConvert<T, T>;
-        constructor(data: Iterable<T>, p: UPredicate<T>, f: UConvert<T, T>);
+        $if: UPredicate<T>;
+        $then: UConvert<T, T>;
+        $else?: UConvert<T, T>;
+        constructor(data: Iterable<T>, $if: UPredicate<T>, $then: UConvert<T, T>, $else?: UConvert<T, T>);
         [Symbol.iterator](): Iterator<T>;
     }
     /**
      * Output of `list.where()`.
      */
     class LazyWhereList<T> extends LazyDataList<T, T> {
-        f: UPredicate<T>;
-        constructor(data: Iterable<T>, f: UPredicate<T>);
+        f?: UPredicate<T>;
+        constructor(data: Iterable<T>, f?: UPredicate<T>);
         [Symbol.iterator](): Iterator<T>;
     }
     /**
      * Output of `list.while()`.
      */
     class LazyWhileList<T> extends LazyDataList<T, T> {
-        f: UPredicate<T>;
-        constructor(data: Iterable<T>, f: UPredicate<T>);
+        f?: UPredicate<T>;
+        constructor(data: Iterable<T>, f?: UPredicate<T>);
         [Symbol.iterator](): Iterator<T>;
     }
     /**

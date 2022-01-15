@@ -127,27 +127,28 @@ namespace LazyList
         }
 
         /**
-         * If `p` matches on an element, it gets converted by `f`.
-         * @param p A predicate function
-         * @param f A conversion function
+         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
+         * @param $if A predicate function
+         * @param $then A conversion function
+         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
          */
-        when(p: UPredicate<O>, f: UConvert<O, O>): LazyWhenList<O> {
-            return new LazyWhenList<O>(this, p, f);
+        when($if: UPredicate<O>, $then: UConvert<O, O>, $else?: UConvert<O, O>): LazyWhenList<O> {
+            return new LazyWhenList<O>(this, $if, $then, $else);
         }
     
         /**
          * Filters the list based on `f`.
-         * @param f A predicate function
+         * @param f A predicate function; If no function is given, falsy elements will be filtered out
          */
-        where(f: UPredicate<O>): LazyWhereList<O> {
+        where(f?: UPredicate<O>): LazyWhereList<O> {
             return new LazyWhereList<O>(this, f);
         }
 
         /**
          * Executes the list until `f` returns `false` for the current element.
-         * @param f A predicate function
+         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
          */
-        while(f: UPredicate<O>): LazyWhileList<O> {
+        while(f?: UPredicate<O>): LazyWhileList<O> {
             return new LazyWhileList<O>(this, f);
         }
     
@@ -283,6 +284,19 @@ namespace LazyList
                     : f(out, e, i, this),
                 i++;
             return out;
+        }
+
+        /**
+         * Returns the index of "obj" in the list if found, -1 otherwise.
+         * @param value The value to search inside the list
+         */
+        indexOf(value: O): number {
+            var i = 0;
+            for (const e of this)
+                if (e === value)
+                    return i;
+                else i++;
+            return -1;
         }
     
         /**
@@ -572,15 +586,17 @@ namespace LazyList
      * Output of `list.when()`.
      */
     export class LazyWhenList<T> extends LazyDataList<T, T> {
-        constructor(data: Iterable<T>, public p: UPredicate<T>, public f: UConvert<T, T>) { super(data); }
+        constructor(data: Iterable<T>, public $if: UPredicate<T>, public $then: UConvert<T, T>, public $else?: UConvert<T, T>) { super(data); }
 
         *[Symbol.iterator](): Iterator<T> {
             var i = 0;
             for (const e of this.data)
             {
-                yield this.p(e, i, this)
-                    ? this.f(e, i, this)
-                    : e;
+                yield this.$if(e, i, this)
+                    ? this.$then(e, i, this)
+                    : this.$else
+                        ? this.$else(e, i, this)
+                        : e;
                 i++;
             }
         }
@@ -590,12 +606,12 @@ namespace LazyList
      * Output of `list.where()`.
      */
     export class LazyWhereList<T> extends LazyDataList<T, T> {
-        constructor(data: Iterable<T>, public f: UPredicate<T>) { super(data); }
+        constructor(data: Iterable<T>, public f?: UPredicate<T>) { super(data); }
 
         *[Symbol.iterator](): Iterator<T> {
             var i = 0;
             for (const e of this.data)
-                if (this.f(e, i++, this))
+                if (this.f ? this.f(e, i++, this) : e)
                     yield e;
         }
     }
@@ -604,12 +620,12 @@ namespace LazyList
      * Output of `list.while()`.
      */
     export class LazyWhileList<T> extends LazyDataList<T, T> {
-        constructor(data: Iterable<T>, public f: UPredicate<T>) { super(data); }
+        constructor(data: Iterable<T>, public f?: UPredicate<T>) { super(data); }
 
         *[Symbol.iterator](): Iterator<T> {
             var i = 0;
             for (const e of this.data)
-                if (this.f(e, i++, this))
+                if (this.f ? this.f(e, i++, this) : e)
                     yield e;
                 else
                     break;

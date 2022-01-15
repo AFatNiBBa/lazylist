@@ -34,6 +34,7 @@ Each `LazyList` allows you to execute these methods. <br>
 For the details look at the JSDocs.
 
 - **`aggregate`**: Aggregates the current list based on a provided function
+- **`indexOf`**: Returns the index of the provided value in the list if found, -1 otherwise
 - **`at`**: Returns the element at the provided index
 - **`first`**: Gets the first element of the list or the provided value as default if it's empty
 - **`last`**: Gets the last element of the list or the provided value as default if it's empty
@@ -51,14 +52,14 @@ For the details look at the JSDocs.
 ### **Lists**
 Methods that generate other `LazyList`s
 - (static & hack) **`attachIterator`**: Makes every `Generator` a `LazyList` and returns the module for chaining
-- (static) **`range`**: Creates a new list that will iterate through the specified boundaries (both the `begin` and `end` boundaries are included); The `count` operation will be calculated on this type of list 
+- (static) **`range`**: Creates a new list that will iterate through the specified boundaries (both the `begin` and `end` boundaries are included); The `count` operation will not compute the list on this type
 - (static) **`from`**: Returns a new `LazyDataList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`merge`**: Concats the current list to an iterable
 - **`zip`**: Combines the current list to an iterable based on a provided function
 - **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
 - **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concats the (iterable) outputs of a provided function that will be applied to each element of the list
-- **`when`**: If a given predicate matches on an element, it gets converted by a convertion function
+- **`when`**: If a given predicate matches on an element, it gets converted by a convertion function, otherwise by an (eventual) other
 - **`where`**: Filters the list based on a provided function
 - **`while`**: Executes the list until the provided function returns `false` for the current element
 - (non lazy?) **`skip`**: Skips the first `n` elements of the list (If `n` is negative, it skips from the end but is not lazy)
