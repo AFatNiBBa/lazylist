@@ -111,6 +111,32 @@ namespace LazyList
         }
     
         /**
+         * Filters the list based on `f`.
+         * @param f A predicate function; If no function is given, falsy elements will be filtered out
+         */
+        where(f?: UPredicate<O>): LazyWhereList<O> {
+            return new LazyWhereList<O>(this, f);
+        }
+
+        /**
+         * Executes the list until `f` returns `false` for the current element.
+         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
+         */
+        while(f?: UPredicate<O>): LazyWhileList<O> {
+            return new LazyWhileList<O>(this, f);
+        }
+
+        /**
+         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
+         * @param $if A predicate function
+         * @param $then A conversion function
+         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
+         */
+        when($if: UPredicate<O>, $then: UConvert<O, O>, $else?: UConvert<O, O>): LazyWhenList<O> {
+            return new LazyWhenList<O>(this, $if, $then, $else);
+        }
+
+        /**
          * Converts the list based on `f`.
          * @param f A conversion function
          */
@@ -127,29 +153,14 @@ namespace LazyList
         }
 
         /**
-         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
-         * @param $if A predicate function
-         * @param $then A conversion function
-         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
+         * Replaces a section of the list with a new one based on `f`, which will be provided with the original section.
+         * @param x The start index of the section
+         * @param y The length of the section
+         * @param f The function that will provide the new section
+         * @param lazy If `true` the section will be lazy but mono-use, and each element not taken will be appended after the new section
          */
-        when($if: UPredicate<O>, $then: UConvert<O, O>, $else?: UConvert<O, O>): LazyWhenList<O> {
-            return new LazyWhenList<O>(this, $if, $then, $else);
-        }
-    
-        /**
-         * Filters the list based on `f`.
-         * @param f A predicate function; If no function is given, falsy elements will be filtered out
-         */
-        where(f?: UPredicate<O>): LazyWhereList<O> {
-            return new LazyWhereList<O>(this, f);
-        }
-
-        /**
-         * Executes the list until `f` returns `false` for the current element.
-         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
-         */
-        while(f?: UPredicate<O>): LazyWhileList<O> {
-            return new LazyWhileList<O>(this, f);
+        replace(x: number, y: number, f: (section: LazyList<O>) => Iterable<O>, lazy?: boolean) : LazyReplaceList<O> {
+            return new LazyReplaceList<O>(this, x, y, f, lazy);
         }
     
         /**
@@ -310,12 +321,12 @@ namespace LazyList
 
         /**
          * Gets the first element of the list or `def` as default if it's empty.
+         * Can be used as `next()` when the source iterable is a generator.
          * @param def The default value
          */
         first<T = null>(def: T = null): O | T {
-            for (const e of this)
-                return e;
-            return def;
+            const temp = this[Symbol.iterator]().next();
+            return temp.done ? def : temp.value;
         }
 
         /**
@@ -555,6 +566,56 @@ namespace LazyList
     }
 
     /**
+     * Output of `list.where()`.
+     */
+    export class LazyWhereList<T> extends LazyDataList<T, T> {
+        constructor(data: Iterable<T>, public f?: UPredicate<T>) { super(data); }
+
+        *[Symbol.iterator](): Iterator<T> {
+            var i = 0;
+            for (const e of this.data)
+                if (this.f ? this.f(e, i++, this) : e)
+                    yield e;
+        }
+    }
+
+    /**
+     * Output of `list.while()`.
+     */
+    export class LazyWhileList<T> extends LazyDataList<T, T> {
+        constructor(data: Iterable<T>, public f?: UPredicate<T>) { super(data); }
+
+        *[Symbol.iterator](): Iterator<T> {
+            var i = 0;
+            for (const e of this.data)
+                if (this.f ? this.f(e, i++, this) : e)
+                    yield e;
+                else
+                    break;
+        }
+    }
+
+    /**
+     * Output of `list.when()`.
+     */
+    export class LazyWhenList<T> extends LazyDataList<T, T> {
+        constructor(data: Iterable<T>, public $if: UPredicate<T>, public $then: UConvert<T, T>, public $else?: UConvert<T, T>) { super(data); }
+
+        *[Symbol.iterator](): Iterator<T> {
+            var i = 0;
+            for (const e of this.data)
+            {
+                yield this.$if(e, i, this)
+                    ? this.$then(e, i, this)
+                    : this.$else
+                        ? this.$else(e, i, this)
+                        : e;
+                i++;
+            }
+        }
+    }
+
+    /**
      * Output of `list.select()`.
      */
     export class LazySelectList<X, Y> extends LazyDataList<X, Y> {
@@ -583,52 +644,19 @@ namespace LazyList
     }
 
     /**
-     * Output of `list.when()`.
+     * Output of `list.replace()`.
      */
-    export class LazyWhenList<T> extends LazyDataList<T, T> {
-        constructor(data: Iterable<T>, public $if: UPredicate<T>, public $then: UConvert<T, T>, public $else?: UConvert<T, T>) { super(data); }
+    export class LazyReplaceList<T> extends LazyDataList<T, T> {
+        constructor(data: Iterable<T>, public x: number, public y: number, public f: (section: LazyList<T>) => Iterable<T>, public lazy: boolean = false) { super(data); }
 
         *[Symbol.iterator](): Iterator<T> {
-            var i = 0;
-            for (const e of this.data)
-            {
-                yield this.$if(e, i, this)
-                    ? this.$then(e, i, this)
-                    : this.$else
-                        ? this.$else(e, i, this)
-                        : e;
-                i++;
-            }
-        }
-    }
+            const iter = this.data[Symbol.iterator]();
+            yield* LazyTakeList.take(iter, this.x) as any as Iterable<T>;
 
-    /**
-     * Output of `list.where()`.
-     */
-    export class LazyWhereList<T> extends LazyDataList<T, T> {
-        constructor(data: Iterable<T>, public f?: UPredicate<T>) { super(data); }
+            const temp = LazyList.from(LazyTakeList.take(iter, this.y) as any as Iterable<T>);
+            yield* this.f(this.lazy ? temp : temp.calc()) ?? [];
 
-        *[Symbol.iterator](): Iterator<T> {
-            var i = 0;
-            for (const e of this.data)
-                if (this.f ? this.f(e, i++, this) : e)
-                    yield e;
-        }
-    }
-
-    /**
-     * Output of `list.while()`.
-     */
-    export class LazyWhileList<T> extends LazyDataList<T, T> {
-        constructor(data: Iterable<T>, public f?: UPredicate<T>) { super(data); }
-
-        *[Symbol.iterator](): Iterator<T> {
-            var i = 0;
-            for (const e of this.data)
-                if (this.f ? this.f(e, i++, this) : e)
-                    yield e;
-                else
-                    break;
+            yield* iter as any as Iterable<T>;
         }
     }
 

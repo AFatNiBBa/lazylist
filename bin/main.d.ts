@@ -80,6 +80,23 @@ declare namespace LazyList {
          */
         join<T, TResult>(other: Iterable<T>, f: UCombine<O, T, TResult>, filter?: UCombine<O, T, boolean, TResult>, mode?: UMode): LazyJoinList<O, T, TResult>;
         /**
+         * Filters the list based on `f`.
+         * @param f A predicate function; If no function is given, falsy elements will be filtered out
+         */
+        where(f?: UPredicate<O>): LazyWhereList<O>;
+        /**
+         * Executes the list until `f` returns `false` for the current element.
+         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
+         */
+        while(f?: UPredicate<O>): LazyWhileList<O>;
+        /**
+         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
+         * @param $if A predicate function
+         * @param $then A conversion function
+         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
+         */
+        when($if: UPredicate<O>, $then: UConvert<O, O>, $else?: UConvert<O, O>): LazyWhenList<O>;
+        /**
          * Converts the list based on `f`.
          * @param f A conversion function
          */
@@ -90,22 +107,13 @@ declare namespace LazyList {
          */
         selectMany<TResult>(f?: UConvert<O, Iterable<TResult>, TResult>): LazySelectManyList<O, TResult>;
         /**
-         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
-         * @param $if A predicate function
-         * @param $then A conversion function
-         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
+         * Replaces a section of the list with a new one based on `f`, which will be provided with the original section.
+         * @param x The start index of the section
+         * @param y The length of the section
+         * @param f The function that will provide the new section
+         * @param lazy If `true` the section will be lazy but mono-use, and each element not taken will be appended after the new section
          */
-        when($if: UPredicate<O>, $then: UConvert<O, O>, $else?: UConvert<O, O>): LazyWhenList<O>;
-        /**
-         * Filters the list based on `f`.
-         * @param f A predicate function; If no function is given, falsy elements will be filtered out
-         */
-        where(f?: UPredicate<O>): LazyWhereList<O>;
-        /**
-         * Executes the list until `f` returns `false` for the current element.
-         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
-         */
-        while(f?: UPredicate<O>): LazyWhileList<O>;
+        replace(x: number, y: number, f: (section: LazyList<O>) => Iterable<O>, lazy?: boolean): LazyReplaceList<O>;
         /**
          * Skips the first `n` elements of the list.
          * @param n The elements to skip (Use a negative number to skip from the end)
@@ -202,6 +210,7 @@ declare namespace LazyList {
         at<T = null>(n: number, def?: T): O | T;
         /**
          * Gets the first element of the list or `def` as default if it's empty.
+         * Can be used as `next()` when the source iterable is a generator.
          * @param def The default value
          */
         first<T = null>(def?: T): O | T;
@@ -314,6 +323,32 @@ declare namespace LazyList {
         [Symbol.iterator](): Iterator<TResult>;
     }
     /**
+     * Output of `list.where()`.
+     */
+    class LazyWhereList<T> extends LazyDataList<T, T> {
+        f?: UPredicate<T>;
+        constructor(data: Iterable<T>, f?: UPredicate<T>);
+        [Symbol.iterator](): Iterator<T>;
+    }
+    /**
+     * Output of `list.while()`.
+     */
+    class LazyWhileList<T> extends LazyDataList<T, T> {
+        f?: UPredicate<T>;
+        constructor(data: Iterable<T>, f?: UPredicate<T>);
+        [Symbol.iterator](): Iterator<T>;
+    }
+    /**
+     * Output of `list.when()`.
+     */
+    class LazyWhenList<T> extends LazyDataList<T, T> {
+        $if: UPredicate<T>;
+        $then: UConvert<T, T>;
+        $else?: UConvert<T, T>;
+        constructor(data: Iterable<T>, $if: UPredicate<T>, $then: UConvert<T, T>, $else?: UConvert<T, T>);
+        [Symbol.iterator](): Iterator<T>;
+    }
+    /**
      * Output of `list.select()`.
      */
     class LazySelectList<X, Y> extends LazyDataList<X, Y> {
@@ -330,29 +365,14 @@ declare namespace LazyList {
         [Symbol.iterator](): Iterator<Y>;
     }
     /**
-     * Output of `list.when()`.
+     * Output of `list.replace()`.
      */
-    class LazyWhenList<T> extends LazyDataList<T, T> {
-        $if: UPredicate<T>;
-        $then: UConvert<T, T>;
-        $else?: UConvert<T, T>;
-        constructor(data: Iterable<T>, $if: UPredicate<T>, $then: UConvert<T, T>, $else?: UConvert<T, T>);
-        [Symbol.iterator](): Iterator<T>;
-    }
-    /**
-     * Output of `list.where()`.
-     */
-    class LazyWhereList<T> extends LazyDataList<T, T> {
-        f?: UPredicate<T>;
-        constructor(data: Iterable<T>, f?: UPredicate<T>);
-        [Symbol.iterator](): Iterator<T>;
-    }
-    /**
-     * Output of `list.while()`.
-     */
-    class LazyWhileList<T> extends LazyDataList<T, T> {
-        f?: UPredicate<T>;
-        constructor(data: Iterable<T>, f?: UPredicate<T>);
+    class LazyReplaceList<T> extends LazyDataList<T, T> {
+        x: number;
+        y: number;
+        f: (section: LazyList<T>) => Iterable<T>;
+        lazy: boolean;
+        constructor(data: Iterable<T>, x: number, y: number, f: (section: LazyList<T>) => Iterable<T>, lazy?: boolean);
         [Symbol.iterator](): Iterator<T>;
     }
     /**

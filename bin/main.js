@@ -78,6 +78,29 @@ var LazyList;
             return new LazyJoinList(this, other, f, filter, mode);
         }
         /**
+         * Filters the list based on `f`.
+         * @param f A predicate function; If no function is given, falsy elements will be filtered out
+         */
+        where(f) {
+            return new LazyWhereList(this, f);
+        }
+        /**
+         * Executes the list until `f` returns `false` for the current element.
+         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
+         */
+        while(f) {
+            return new LazyWhileList(this, f);
+        }
+        /**
+         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
+         * @param $if A predicate function
+         * @param $then A conversion function
+         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
+         */
+        when($if, $then, $else) {
+            return new LazyWhenList(this, $if, $then, $else);
+        }
+        /**
          * Converts the list based on `f`.
          * @param f A conversion function
          */
@@ -92,27 +115,14 @@ var LazyList;
             return new LazySelectManyList(this, f);
         }
         /**
-         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
-         * @param $if A predicate function
-         * @param $then A conversion function
-         * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
+         * Replaces a section of the list with a new one based on `f`, which will be provided with the original section.
+         * @param x The start index of the section
+         * @param y The length of the section
+         * @param f The function that will provide the new section
+         * @param lazy If `true` the section will be lazy but mono-use, and each element not taken will be appended after the new section
          */
-        when($if, $then, $else) {
-            return new LazyWhenList(this, $if, $then, $else);
-        }
-        /**
-         * Filters the list based on `f`.
-         * @param f A predicate function; If no function is given, falsy elements will be filtered out
-         */
-        where(f) {
-            return new LazyWhereList(this, f);
-        }
-        /**
-         * Executes the list until `f` returns `false` for the current element.
-         * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
-         */
-        while(f) {
-            return new LazyWhileList(this, f);
+        replace(x, y, f, lazy) {
+            return new LazyReplaceList(this, x, y, f, lazy);
         }
         /**
          * Skips the first `n` elements of the list.
@@ -256,12 +266,12 @@ var LazyList;
         }
         /**
          * Gets the first element of the list or `def` as default if it's empty.
+         * Can be used as `next()` when the source iterable is a generator.
          * @param def The default value
          */
         first(def = null) {
-            for (const e of this)
-                return e;
-            return def;
+            const temp = this[Symbol.iterator]().next();
+            return temp.done ? def : temp.value;
         }
         /**
          * Gets the last element of the list or `def` as default if it's empty.
@@ -496,61 +506,6 @@ var LazyList;
     }
     LazyList_1.LazyJoinList = LazyJoinList;
     /**
-     * Output of `list.select()`.
-     */
-    class LazySelectList extends LazyDataList {
-        constructor(data, f) {
-            super(data);
-            this.f = f;
-        }
-        *[Symbol.iterator]() {
-            var i = 0;
-            for (const e of this.data)
-                yield this.f(e, i++, this);
-        }
-    }
-    LazyList_1.LazySelectList = LazySelectList;
-    /**
-     * Output of `list.selectMany()`.
-     */
-    class LazySelectManyList extends LazyDataList {
-        constructor(data, f) {
-            super(data);
-            this.f = f;
-        }
-        *[Symbol.iterator]() {
-            var i = 0;
-            for (const e of this.data)
-                yield* this.f
-                    ? this.f(e, i++, this)
-                    : e;
-        }
-    }
-    LazyList_1.LazySelectManyList = LazySelectManyList;
-    /**
-     * Output of `list.when()`.
-     */
-    class LazyWhenList extends LazyDataList {
-        constructor(data, $if, $then, $else) {
-            super(data);
-            this.$if = $if;
-            this.$then = $then;
-            this.$else = $else;
-        }
-        *[Symbol.iterator]() {
-            var i = 0;
-            for (const e of this.data) {
-                yield this.$if(e, i, this)
-                    ? this.$then(e, i, this)
-                    : this.$else
-                        ? this.$else(e, i, this)
-                        : e;
-                i++;
-            }
-        }
-    }
-    LazyList_1.LazyWhenList = LazyWhenList;
-    /**
      * Output of `list.where()`.
      */
     class LazyWhereList extends LazyDataList {
@@ -584,6 +539,81 @@ var LazyList;
         }
     }
     LazyList_1.LazyWhileList = LazyWhileList;
+    /**
+     * Output of `list.when()`.
+     */
+    class LazyWhenList extends LazyDataList {
+        constructor(data, $if, $then, $else) {
+            super(data);
+            this.$if = $if;
+            this.$then = $then;
+            this.$else = $else;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const e of this.data) {
+                yield this.$if(e, i, this)
+                    ? this.$then(e, i, this)
+                    : this.$else
+                        ? this.$else(e, i, this)
+                        : e;
+                i++;
+            }
+        }
+    }
+    LazyList_1.LazyWhenList = LazyWhenList;
+    /**
+     * Output of `list.select()`.
+     */
+    class LazySelectList extends LazyDataList {
+        constructor(data, f) {
+            super(data);
+            this.f = f;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const e of this.data)
+                yield this.f(e, i++, this);
+        }
+    }
+    LazyList_1.LazySelectList = LazySelectList;
+    /**
+     * Output of `list.selectMany()`.
+     */
+    class LazySelectManyList extends LazyDataList {
+        constructor(data, f) {
+            super(data);
+            this.f = f;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const e of this.data)
+                yield* this.f
+                    ? this.f(e, i++, this)
+                    : e;
+        }
+    }
+    LazyList_1.LazySelectManyList = LazySelectManyList;
+    /**
+     * Output of `list.replace()`.
+     */
+    class LazyReplaceList extends LazyDataList {
+        constructor(data, x, y, f, lazy = false) {
+            super(data);
+            this.x = x;
+            this.y = y;
+            this.f = f;
+            this.lazy = lazy;
+        }
+        *[Symbol.iterator]() {
+            const iter = this.data[Symbol.iterator]();
+            yield* LazyTakeList.take(iter, this.x);
+            const temp = LazyList.from(LazyTakeList.take(iter, this.y));
+            yield* this.f(this.lazy ? temp : temp.calc()) ?? [];
+            yield* iter;
+        }
+    }
+    LazyList_1.LazyReplaceList = LazyReplaceList;
     /**
      * Output of `list.skip()`.
      */
