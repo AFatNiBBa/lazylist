@@ -69,7 +69,7 @@ declare namespace LazyList {
         /**
          * Joins the current list with {@link other} based on {@link f}, where the condition {@link filter} is met.
          * If no {@link filter} argument is supplied, the method does the cartesian product of the two lists (And {@link mode} becomes useless).
-         * If {@link mode} is not `UMode.inner`, `null` will be supplied as the missing element.
+         * If {@link mode} is not `UMode.inner`, `undefined` will be supplied as the missing element.
          * The index available in the functions is the one of the "left" part in the `UMode.inner` operation, and `-1` in the {@link outer} part.
          * The "right" part ({@link other}) will be calculeted one time for each element of the "left" part and must be of the same size each time.
          * Wrap {@link other} in a `LazyCacheList` (Or use the `list.cache()` method) to cache the elements.
