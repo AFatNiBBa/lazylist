@@ -31,14 +31,14 @@ var LazyList;
          * Returns an auto-generated list of numbers.
          * @param end The end of the sequence
          * @param begin The begin of the sequence
-         * @param step The difference between each step of the sequence (If `end` is greater than `begin` it will be `-1` by default)
+         * @param step The difference between each step of the sequence (If {@link end} is greater than {@link begin} it will be `-1` by default)
          */
         static range(end, begin, step) {
             return new LazyRangeList(end, begin, step);
         }
         /**
          * Returns a `LazyList` based on an iterable.
-         * If `data` is already a `LazyList`, it gets returned directly, otherwise it gets wrapped in a `LazyDataList`.
+         * If {@link data} is already a `LazyList`, it gets returned directly, otherwise it gets wrapped in a `LazyDataList`.
          * @param data The iterable
          */
         static from(data) {
@@ -47,14 +47,14 @@ var LazyList;
                 : new LazyDataList(data);
         }
         /**
-         * Merges the current list to `other`.
+         * Merges the current list to {@link other}.
          * @param other An iterable
          */
         merge(other) {
             return new LazyMergeList(this, other);
         }
         /**
-         * Combines the current list with `other` based on `f`.
+         * Combines the current list with {@link other} based on {@link f}.
          * @param other An iterable
          * @param f A combination function
          * @param mode Different length handling
@@ -63,12 +63,12 @@ var LazyList;
             return new LazyZipList(this, other, f, mode);
         }
         /**
-         * Joins the current list with `other` based on `f`, where the condition `filter` is met.
-         * If no `filter` argument is supplied, the method does the cartesian product of the two lists (And `mode` becomes useless).
-         * If `mode` is not "inner", `null` will be supplied as the missing element.
-         * The index available in the functions is the one of the "left" part in the "inner" operation, and `-1` in the "outer" part.
-         * The "right" part (`other`) will be calculeted one time for each element of the "left" part and must be of the same size each time.
-         * Wrap `other` in a `LazyCacheList` (Or use the `list.cache()` method) to cache the elements.
+         * Joins the current list with {@link other} based on {@link f}, where the condition {@link filter} is met.
+         * If no {@link filter} argument is supplied, the method does the cartesian product of the two lists (And {@link mode} becomes useless).
+         * If {@link mode} is not `UMode.inner`, `null` will be supplied as the missing element.
+         * The index available in the functions is the one of the "left" part in the `UMode.inner` operation, and `-1` in the {@link outer} part.
+         * The "right" part ({@link other}) will be calculeted one time for each element of the "left" part and must be of the same size each time.
+         * Wrap {@link other} in a `LazyCacheList` (Or use the `list.cache()` method) to cache the elements.
          * @param other An iterable
          * @param filter A filter function
          * @param f A combination function
@@ -78,21 +78,21 @@ var LazyList;
             return new LazyJoinList(this, other, f, filter, mode);
         }
         /**
-         * Filters the list based on `f`.
+         * Filters the list based on {@link f}.
          * @param f A predicate function; If no function is given, falsy elements will be filtered out
          */
         where(f) {
             return new LazyWhereList(this, f);
         }
         /**
-         * Executes the list until `f` returns `false` for the current element.
+         * Executes the list until {@link f} returns `false` for the current element.
          * @param f A predicate function; If no function is given, it stops executing the list as soon as the current element is falsy
          */
         while(f) {
             return new LazyWhileList(this, f);
         }
         /**
-         * If `$if` matches on an element, it gets converted by `$then`, otherwise it gets converted by `$else`.
+         * If {@link $if} matches on an element, it gets converted by {@link $then}, otherwise it gets converted by {@link $else}.
          * @param $if A predicate function
          * @param $then A conversion function
          * @param $else A conversion function; If no function is given, the current element will be yielded without modifications
@@ -101,21 +101,21 @@ var LazyList;
             return new LazyWhenList(this, $if, $then, $else);
         }
         /**
-         * Converts the list based on `f`.
+         * Converts the list based on {@link f}.
          * @param f A conversion function
          */
         select(f) {
             return new LazySelectList(this, f);
         }
         /**
-         * Converts the current list to an iterables list based on `f` and concats every element.
+         * Converts the current list to an iterables list based on {@link f} and concats every element.
          * @param f A conversion function; Can be omitted if every element is iterable
          */
         selectMany(f) {
             return new LazySelectManyList(this, f);
         }
         /**
-         * Replaces a section of the list with a new one based on `f`, which will be provided with the original section.
+         * Replaces a section of the list with a new one based on {@link f}, which will be provided with the original section.
          * @param x The start index of the section
          * @param y The length of the section
          * @param f The function that will provide the new section
@@ -125,29 +125,29 @@ var LazyList;
             return new LazyReplaceList(this, x, y, f, lazy);
         }
         /**
-         * Skips the first `n` elements of the list.
+         * Skips the first {@link n} elements of the list.
          * @param n The elements to skip (Use a negative number to skip from the end)
          */
         skip(n) {
             return new LazySkipList(this, n);
         }
         /**
-         * Takes the first `n` elements of the list and skips the rest.
+         * Takes the first {@link n} elements of the list and skips the rest.
          * @param n The elements to take (Use a negative number to take from the end)
-         * @param outer If truthy and `n` is more than the list length, the output list will be forced to have length `n` by concatenating as many `undefined` as needed
+         * @param outer If truthy and {@link n} is more than the list length, the output list will be forced to have length {@link n} by concatenating as many `undefined` as needed
          */
         take(n, outer) {
             return new LazyTakeList(this, n, outer);
         }
         /**
-         * Groups the list's elements, `n` at a time.
-         * Non lazy by default, but can be made lazy by setting `lazy` as `true`.
+         * Groups the list's elements, {@link n} at a time.
+         * Non lazy by default, but can be made lazy by setting {@link lazy} as `true`.
          * If the list is set to lazy you should NEVER calculate the parent iterator before the childrens, like:
          *
          *     LazyList.from([1,2,3]).slice(2,false,true).value; // Stops
          * Additionally a lot of unexpected behaviours could occur.
          * @param n The length of each slice
-         * @param outer If truthy, every slice will be forced to have `n` elements by concatenating as many `undefined` as needed
+         * @param outer If truthy, every slice will be forced to have {@link n} elements by concatenating as many `undefined` as needed
          * @param lazy Indicates if the list should be lazy (and unsafe)
          */
         slice(n, outer, lazy) {
@@ -162,7 +162,7 @@ var LazyList;
             return new LazyGroupByList(this, f);
         }
         /**
-         * Orders the list; It counts the element so that it is faster when there are a lot of copies (For that reason, the index is not available on `f` since it would be wrong).
+         * Orders the list; It counts the element so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} since it would be wrong).
          * Non lazy.
          * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
          * @param desc Reverses the results
@@ -178,7 +178,7 @@ var LazyList;
             return new LazyReverseList(this);
         }
         /**
-         * Repeat the list's elements n times.
+         * Repeat the list's elements {@link n} times.
          * @param n The number of repetitions
          */
         repeat(n) {
@@ -197,21 +197,21 @@ var LazyList;
             return new LazyWrapList(this);
         }
         /**
-         * Executes `f` on each element of the list and returns the current element (not the output of `f`).
+         * Executes {@link f} on each element of the list and returns the current element (not the output of {@link f}).
          * @param f A function
          */
         but(f) {
             return new LazySelectList(this, (e, i, data) => (f(e, i, data), e));
         }
         /**
-         * Executes `Object.assign()` on each element passing `obj` as the second parameter.
+         * Executes `Object.assign()` on each element passing {@link obj} as the second parameter.
          * @param obj An object
          */
         assign(obj) {
             return new LazySelectList(this, x => Object.assign(x, obj));
         }
         /**
-         * Filters the list returning only the elements which are instances of `f`.
+         * Filters the list returning only the elements which are instances of {@link f}.
          * @param f A constructor
          */
         ofType(f) {
@@ -230,7 +230,7 @@ var LazyList;
             return new LazyDataList(await Promise.all(this));
         }
         /**
-         * Aggregates the list based on `f`.
+         * Aggregates the list based on {@link f}.
          * @param f A combination function
          * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration).
          */
@@ -244,7 +244,7 @@ var LazyList;
             return out;
         }
         /**
-         * Returns the index of "obj" in the list if found, -1 otherwise.
+         * Returns the index of {@link value} in the list if found, `-1` otherwise.
          * @param value The value to search inside the list
          */
         indexOf(value) {
@@ -265,7 +265,7 @@ var LazyList;
             return this.skip(n).first(def);
         }
         /**
-         * Gets the first element of the list or `def` as default if it's empty.
+         * Gets the first element of the list or {@link def} as default if it's empty.
          * Can be used as `next()` when the source iterable is a generator.
          * @param def The default value
          */
@@ -274,8 +274,8 @@ var LazyList;
             return temp.done ? def : temp.value;
         }
         /**
-         * Gets the last element of the list or `def` as default if it's empty.
-         * @param def The default value
+         * Gets the last element of the list or {@link out} as default if it's empty.
+         * @param out The default value
          */
         last(out = null) {
             for (const e of this)
@@ -283,7 +283,7 @@ var LazyList;
             return out;
         }
         /**
-         * Returns `true` if `f` returns `true` for every element of the list.
+         * Returns `true` if {@link f} returns `true` for every element of the list.
          * @param f A predicate function; It defaults to the identity function
          */
         all(f) {
@@ -294,7 +294,7 @@ var LazyList;
             return true;
         }
         /**
-         * Returns `true` if `f` returns `true` for at least one element of the list.
+         * Returns `true` if {@link f} returns `true` for at least one element of the list.
          * @param f A predicate function; It defaults to the identity function
          */
         any(f) {
@@ -312,7 +312,7 @@ var LazyList;
             return this.any(x => Object.is(x, v));
         }
         /**
-         * Joins the list elements using `sep` as the separator.
+         * Joins the list elements using {@link sep} as the separator.
          * @param sep The separator
          */
         concat(sep = "") {
@@ -623,7 +623,7 @@ var LazyList;
             this.n = n;
         }
         /**
-         * Utility function that skips `n` elements from `data`.
+         * Utility function that skips {@link n} elements from {@link data}.
          * @param data An iterable
          * @param n The elements to skip
          */
@@ -651,13 +651,13 @@ var LazyList;
             this.outer = outer;
         }
         /**
-         * Utility function that takes `n` elements from `iter`.
+         * Utility function that takes {@link n} elements from {@link iter}.
          * @param iter A marked iterator
          * @param n The elements to take
-         * @param outer If truthy and `n` is more than the iterator length, the output will be forced to have length `n` by yielding as many `undefined` as needed
+         * @param outer If truthy and {@link n} is more than the iterator length, the output will be forced to have length {@link n} by yielding as many `undefined` as needed
          */
         static *take(iter, n, outer = false) {
-            for (var i = 0; i < n; i++) // If this were a foreach loop the first element after `n` would be calculated too
+            for (var i = 0; i < n; i++) // If this were a foreach loop the first element after {@link n} would be calculated too
              {
                 const e = iter.next();
                 if ((iter.done = e.done) && !outer)
@@ -686,7 +686,7 @@ var LazyList;
         *[Symbol.iterator]() {
             const iter = this.data[Symbol.iterator](); // The same iterator is used to exclude previous outputs
             while (!iter.done) {
-                const e = LazyList.from(LazyTakeList.take(iter, this.n, this.outer)); // This doesn't use the normal `list.take()` because I would have reconverted `iter` into an iterable
+                const e = LazyList.from(LazyTakeList.take(iter, this.n, this.outer)); // This doesn't use the normal `list.take()` because I would have reconverted "iter" into an iterable
                 yield this.lazy
                     ? e
                     : e.calc();
@@ -696,7 +696,7 @@ var LazyList;
     LazyList_1.LazySliceList = LazySliceList;
     /**
      * Element of the output of `list.groupBy()`.
-     * The group common value is contained in the "key" property.
+     * The group common value is contained in the {@link key} property.
      * The group is a `LazyList` itself.
      */
     class UGrouping extends LazyDataList {
