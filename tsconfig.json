@@ -1,11 +1,11 @@
 {
 	"version" : "3.0.3",
-	"include": [ "./**/*.ts", "./**/*.js" ],
-	"exclude": [ "./bin/**" ],
+	"include": [ "./src/**/*.ts", "./src/**/*.js" ],
 	"compilerOptions" : {
 		"module": "CommonJS",
 		// "removeComments" : true,
-		"outDir" : "./bin",
+		"outDir" : "./dist",
+		"experimentalDecorators": true,
 		"baseUrl" : "./",
 		"sourceMap" : true,
 		"declaration" : true,

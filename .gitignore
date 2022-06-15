@@ -1,6 +1,8 @@
+
 # Sean
-prv_*
+*.prv*
 desktop.ini
+package-lock.json
 
 # Logs
 logs
