@@ -1,11 +1,10 @@
 {
   "name": "lazylist.js",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Data structures that compute their elements only when needed",
   "main": "dist/main.js",
   "scripts": {
-    "save": "npm publish & push",
-    "test": "tsc & cls & node dist/test.prv.js"
+    "save": "npm publish & push"
   },
   "keywords": [
     "ienumerable",
