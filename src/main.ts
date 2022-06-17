@@ -66,13 +66,11 @@ namespace LazyList {
         abstract [Symbol.iterator](): Iterator<T>;
 
         /**
-         * If {@link p} matches on an element, it gets converted by {@link f}, otherwise it gets converted by {@link e}
-         * @param p A predicate function
-         * @param f A conversion function
-         * @param e A conversion function; If no function is given, the current element will be yielded without modifications
+         * Ensures every element of the list shows up only once
+         * @param f A conversion function that returns the the part of the element to check duplicates for; If omitted, the element itself will be used
          */
-        when(p: Predicate<T, LazyWhenList<T>>, f: Convert<T, T, LazyWhenList<T>>, e?: Convert<T, T, LazyWhenList<T>>) {
-            return new LazyWhenList<T>(this, p, f, e);
+        distinct<TKey>(f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) {
+            return new LazyDistinctList<TKey, T>(this, f);
         }
 
         /**
@@ -81,6 +79,16 @@ namespace LazyList {
          */
         where(p?: Predicate<T, LazyWhereList<T>>) {
             return new LazyWhereList(this, p);
+        }
+
+        /**
+         * If {@link p} matches on an element, it gets converted by {@link f}, otherwise it gets converted by {@link e}
+         * @param p A predicate function
+         * @param f A conversion function
+         * @param e A conversion function; If no function is given, the current element will be yielded without modifications
+         */
+        when(p: Predicate<T, LazyWhenList<T>>, f: Convert<T, T, LazyWhenList<T>>, e?: Convert<T, T, LazyWhenList<T>>) {
+            return new LazyWhenList<T>(this, p, f, e);
         }
 
         /**
@@ -513,6 +521,31 @@ namespace LazyList {
         }
     }
 
+    /** Output of {@link distinct} */
+    export class LazyDistinctList<TKey, T> extends LazySourceList<T, T> {
+        constructor (source: Iterable<T>, public f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) { super(source); }
+
+        *[Symbol.iterator]() {
+            var i = 0;
+            const set = new Set<TKey>();
+            for (const elm of this.source)
+                if (set.size != set.add(this.f ? this.f(elm, i++, this) : <any>elm).size)
+                    yield elm;
+        }
+    }
+
+    /** Output of {@link where} */
+    export class LazyWhereList<T> extends LazySourceList<T, T> {
+        constructor (source: Iterable<T>, public p?: Predicate<T, LazyWhereList<T>>) { super(source); }
+
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const elm of this.source)
+                if (this.p ? this.p(elm, i++, this) : elm)
+                    yield elm;
+        }
+    }
+
     /** Output of {@link when} */
     export class LazyWhenList<T> extends LazyFixedList<T, T> {
         constructor (source: Iterable<T>, public p: Predicate<T, LazyWhenList<T>>, public f: Convert<T, T, LazyWhenList<T>>, public e?: Convert<T, T, LazyWhenList<T>>) { super(source); }
@@ -526,18 +559,6 @@ namespace LazyList {
                         ? this.e(elm, i, this)
                         : elm,
                 i++;
-        }
-    }
-
-    /** Output of {@link where} */
-    export class LazyWhereList<T> extends LazySourceList<T, T> {
-        constructor (source: Iterable<T>, public p?: Predicate<T, LazyWhereList<T>>) { super(source); }
-
-        *[Symbol.iterator]() {
-            var i = 0;
-            for (const elm of this.source)
-                if (this.p ? this.p(elm, i++, this) : elm)
-                    yield elm;
         }
     }
 

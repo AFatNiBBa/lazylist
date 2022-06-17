@@ -56,8 +56,9 @@ Methods that generate other `LazyList`s
 - (static & hack) **`attachIterator`**: Makes every `Generator` a `LazyList` and returns the module for chaining
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
-- **`when`**: If a given predicate matches on an element, it gets converted by a convertion function, otherwise by an (eventual) other
+- **`distinct`**: Ensures every element of the current list shows up only once
 - **`where`**: Filters the list based on a provided function
+- **`when`**: If a given predicate matches on an element, it gets converted by a convertion function, otherwise by an (eventual) other
 - **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concats the (iterable) outputs of a provided function that will be applied to each element of the list
 - **`merge`**: Concats the current list to an iterable
