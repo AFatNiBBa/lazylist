@@ -3,11 +3,11 @@
 Data structures that compute their elements only when needed <br>
 Even in the browser! Just add this to your HTML code...
 ```html
-<script src="https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/bin/main.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/dist/main.js"></script>
 ```
 ...or this to your JavaScript
 ```js
-document.head.append(Object.assign(document.createElement("script"), { src: "https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/bin/main.js" }));
+document.head.append(Object.assign(document.createElement("script"), { src: "https://cdn.jsdelivr.net/gh/AFatNiBBa/lazylist@latest/dist/main.js" }));
 ```
 
 ## Usage
