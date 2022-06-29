@@ -36,6 +36,7 @@ For the details look at the JSDocs.
 - **`at`**: Returns the element at the provided index
 - **`last`**: Gets the last element of the list or the provided value as default if it's empty
 - **`first`**: Gets the first element of the list or the provided value as default if it's empty
+- **`single`**: Gets the first element of the current list if it has exactly `1` element, otherwise the provided value as default, unless none is passed, in that case it throws a `RangeError`
 - **`aggregate`**: Aggregates the current list based on a provided function
 - **`all`**: Returns `true` if the provided predicate returns `true` for every element of the list
 - **`any`**: Returns `true` if the provided predicate returns `true` for at least one element of the list
@@ -69,6 +70,7 @@ Methods that generate other `LazyList`s
 - (non lazy) **`reverse`**: Reverses the list
 - (non lazy) **`sort`**: Sorts the list based on a provided function
 - **`splice`**: Replaces a section of the list with a new one based on a provided function
+**`fixedCount`**: Throws a `RangeError` if the current list has not exactly `n` elements
 - (non lazy?) **`skip`**: Skips the first `n` elements of the list (If `n` is negative, it skips from the end but is not lazy)
 - (non lazy?) **`take`**: Takes only the first `n` elements of the list (If `n` is negative, it takes from the end but is not lazy)
 - **`zip`**: Combines the current list to an iterable based on a provided function
@@ -78,6 +80,8 @@ Methods that generate other `LazyList`s
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
 - (non lazy) **`calc`**: Calculates each element of the list and wraps them in another `LazyList`
 - (non lazy) **`await`**: Calculates and awaits each element of the list and wraps them in another `LazyList`
+- **`then`**: Applies a "then" function to each element of the current list (whose elements should be promises)
+- **`catch`**: Applies a "catch" function to each element of the current list (whose elements should be promises)
 - **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
 - **`ofType`**: Filters the list returning only the elements which are instances of the given constructor
 - **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)

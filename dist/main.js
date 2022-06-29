@@ -160,6 +160,14 @@ function LazyList(source) {
             return new LazySpliceList(this, start, length, f, lazy);
         }
         /**
+         * Throws a {@link RangeError} if the list has not exactly {@link n} elements.
+         * Notice that if the iteration its stopped before the end the input list could have more than {@link n} elements
+         * @param n The number of elements the list must have
+         */
+        fixedCount(n) {
+            return new LazyFixedCountList(this, n);
+        }
+        /**
          * Skips the first {@link p} elements of the list
          * @param p The elements to skip (Use a negative number to skip from the end); If a function is given, it will be called for each element and the elements will be skipped until the function returns `false`
          */
@@ -233,6 +241,20 @@ function LazyList(source) {
         async await() {
             return new LazyFixedList(await Promise.all(this));
         }
+        /**
+         * Converts the list based on {@link f}
+         * @param f A conversion function, to which values of the awaited type of {@link T} will be passed
+         */
+        then(f) {
+            return new LazySelectList(this, async (x, i, list) => f(await x, i, list));
+        }
+        /**
+         * Catches the promise errors using the {@link f} function
+         * @param f A conversion function, to which errors of the list's promises will be passed
+         */
+        catch(f) {
+            return new LazySelectList(this, (x, i, list) => Promise.resolve(x).catch(e => f(e, i, list)));
+        }
         /** Outputs a {@link LazyFixedList} that will contain the current one as its only element */
         wrap() {
             return new LazyFixedList([this]);
@@ -301,6 +323,18 @@ function LazyList(source) {
             return temp.done
                 ? def
                 : temp.value;
+        }
+        /**
+         * Gets the first element of the list if it has exactly `1` element, otherwise the provided value as default, unless none is passed, in that case it throws a `RangeError`
+         * @param def The default value; If provided, it will be returned instead of throwing an error
+         */
+        single(def) {
+            const temp = this.take(2).value;
+            if (temp.length === 1)
+                return temp[0];
+            if (arguments.length === 0)
+                throw new RangeError("List has not exactly 1 element");
+            return def;
         }
         /**
          * Aggregates the list based on {@link f}
@@ -675,6 +709,27 @@ function LazyList(source) {
         }
     }
     LazyList.LazySpliceList = LazySpliceList;
+    /** Output of {@link LazyAbstractList.fixedCount} */
+    class LazyFixedCountList extends LazyFixedList {
+        constructor(source, n) {
+            super(source);
+            this.n = n;
+        }
+        *[Symbol.iterator]() {
+            const iter = this.source[Symbol.iterator]();
+            for (var value, i = 0; i < this.n; i++)
+                if (({ value } = iter.next()).done)
+                    throw new RangeError(`Fixed count list has less than ${this.n} element${this.n - 1 ? 's' : ''}`);
+                else
+                    yield value;
+            if (!iter.next().done)
+                throw new RangeError(`Fixed count list has more than ${this.n} elements${this.n - 1 ? 's' : ''}`);
+        }
+        get fastCount() {
+            return this.n;
+        }
+    }
+    LazyList.LazyFixedCountList = LazyFixedCountList;
     /** Output of {@link LazyAbstractList.skip} */
     class LazySkipList extends LazySourceList {
         constructor(source, p) {

@@ -78,7 +78,7 @@ namespace LazyList {
          * @param p A predicate function; If no function is given, falsy elements will be filtered out
          */
         where(p?: Predicate<T, LazyWhereList<T>>) {
-            return new LazyWhereList(this, p);
+            return new LazyWhereList<T>(this, p);
         }
 
         /**
@@ -96,7 +96,7 @@ namespace LazyList {
          * @param f A conversion function
          */
         select<TResult>(f: Convert<T, TResult, LazySelectList<T, TResult>>) {
-            return new LazySelectList(this, f);
+            return new LazySelectList<T, TResult>(this, f);
         }
 
         /**
@@ -106,7 +106,7 @@ namespace LazyList {
         selectMany<TResult>(f?: Convert<T, Iterable<TResult>, LazySelectManyList<T, TResult>>) {
             return new LazySelectManyList<T, TResult>(this, f);
         }
-
+ 
         /**
          * Merges the current list to {@link other}
          * @param other An iterable
@@ -178,6 +178,15 @@ namespace LazyList {
          */
         splice(start: number, length?: number, f?: (x: LazyFixedList<T, T>) => Iterable<T>, lazy?: boolean) {
             return new LazySpliceList<T>(this, start, length, f, lazy);
+        }
+
+        /**
+         * Throws a {@link RangeError} if the list has not exactly {@link n} elements.
+         * Notice that if the iteration its stopped before the end the input list could have more than {@link n} elements
+         * @param n The number of elements the list must have
+         */
+        fixedCount(n: number) {
+            return new LazyFixedCountList(this, n);
         }
 
         /**
@@ -259,8 +268,24 @@ namespace LazyList {
         }
 
         /** Calculates and awaits each element of the list and wraps them in a {@link LazyFixedList} */
-        async await() {
-            return new LazyFixedList(await Promise.all(this));
+        async await<TAwaited>(this: LazyAbstractList<PromiseLike<TAwaited>>): Promise<LazyFixedList<TAwaited, TAwaited>> {
+            return new LazyFixedList<TAwaited, TAwaited>(await Promise.all(this));
+        }
+
+        /**
+         * Converts the list based on {@link f}
+         * @param f A conversion function, to which values of the awaited type of {@link T} will be passed 
+         */
+        then<TAwaited, TResult>(this: LazyAbstractList<PromiseLike<TAwaited>>, f: Convert<TAwaited, TResult, LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>>) {
+            return new LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>(this, async (x, i, list) => f(await x, i, list));
+        }
+
+        /**
+         * Catches the promise errors using the {@link f} function
+         * @param f A conversion function, to which errors of the list's promises will be passed 
+         */
+        catch<TAwaited>(this: LazyAbstractList<PromiseLike<TAwaited>>, f: Convert<any, TAwaited, LazySelectList<PromiseLike<TAwaited>, Promise<TAwaited>>>) {
+            return new LazySelectList<PromiseLike<TAwaited>, Promise<TAwaited>>(this, (x, i, list) => Promise.resolve(x).catch(e => f(e, i, list)));
         }
 
         /** Outputs a {@link LazyFixedList} that will contain the current one as its only element */
@@ -272,8 +297,8 @@ namespace LazyList {
          * Filters the list returning only the elements which are instances of {@link ctor}
          * @param ctor A constructor
          */
-        ofType<TResult extends T>(ctor: new (...args: any[]) => TResult) {
-            return new LazyWhereList(this, x => x instanceof ctor) as LazyWhereList<TResult>;
+        ofType<TResult extends T>(ctor: new (...args: any[]) => TResult): LazyWhereList<TResult> {
+            return new LazyWhereList(this, x => x instanceof ctor) as any;
         }
 
         /**
@@ -340,6 +365,22 @@ namespace LazyList {
             return temp.done
                 ? def
                 : temp.value;
+        }
+
+        /**
+         * Gets the first element of the list if it has exactly `1` element, otherwise the provided value as default, unless none is passed, in that case it throws a `RangeError`
+         * @param def The default value; If provided, it will be returned instead of throwing an error
+         */
+        single(def?: T): T {
+            const temp = this.take(2).value;
+
+            if (temp.length === 1)
+                return temp[0];
+
+            if (arguments.length === 0)
+                throw new RangeError("List has not exactly 1 element");
+
+            return def;
         }
 
         /**
@@ -472,12 +513,12 @@ namespace LazyList {
                 yield* <any>this.source;
         }
 
-        base() {
+        base(): I[] {
             return this.source == null
                     ? []
                 : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
-                    ? this.source
-                    : Array.from(this.source);
+                    ? this.source as any
+                    : Array.from(this.source) as any;
         }
     }
 
@@ -486,7 +527,7 @@ namespace LazyList {
      * Instances of this class have the {@link fastCount} property, which returns the length of the iterable if it is easy to compute, otherwise it returns `-1`
      */
     export class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
-        get fastCount() {
+        get fastCount(): number {
             return this.source == null
                     ? 0
                 : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
@@ -700,6 +741,28 @@ namespace LazyList {
 
             for (var value: T; !({ value } = iter.next()).done; )
                 yield value;
+        }
+    }
+
+    /** Output of {@link LazyAbstractList.fixedCount} */
+    export class LazyFixedCountList<T> extends LazyFixedList<T, T> {
+        constructor (source: Iterable<T>, public n: number) { super(source); }
+
+        *[Symbol.iterator]() {
+            const iter = this.source[Symbol.iterator]();
+            
+            for (var value: T, i = 0; i < this.n; i++)
+                if (({ value } = iter.next()).done)
+                    throw new RangeError(`Fixed count list has less than ${ this.n } element${ this.n - 1 ? 's' : '' }`);
+                else
+                    yield value;
+
+            if (!iter.next().done)
+                throw new RangeError(`Fixed count list has more than ${ this.n } elements${ this.n - 1 ? 's' : '' }`);
+        }
+
+        get fastCount() {
+            return this.n;
         }
     }
 
