@@ -44,10 +44,26 @@ namespace LazyList {
      * Makes every {@link Generator} extend from {@link LazyList.LazyAbstractList}
      * @returns The library itself
      */
-    export function attachIterator() {
+     export function attachIterator() {
         //@ts-ignore
         (function*(){})().__proto__.__proto__.__proto__.__proto__ = LazyAbstractList.prototype;
         return LazyList;
+    }
+
+    /**
+     * Returns the length of the iterable if it is easy to compute, otherwise it returns `-1`
+     * @param source The iterable from which to get the count
+     */
+    export function fastCount(source: Iterable<any>): number {
+        return source == null
+            ? 0
+            : typeof source === "string" || source instanceof String || source instanceof Array
+                ? source.length
+                : source instanceof Set || source instanceof Map
+                    ? source.size
+                    : source instanceof LazyList.LazyAbstractList
+                        ? source.fastCount
+                        : -1;
     }
 
     /**
@@ -63,14 +79,23 @@ namespace LazyList {
 
     /** An iterable wrapper with helper functions */
     export abstract class LazyAbstractList<T> {
-        abstract [Symbol.iterator](): Iterator<T>;
+        abstract [Symbol.iterator](): Generator<T>;
 
         /**
          * Ensures every element of the list shows up only once
          * @param f A conversion function that returns the the part of the element to check duplicates for; If omitted, the element itself will be used
          */
-        distinct<TKey>(f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) {
+        distinct<TKey = T>(f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) {
             return new LazyDistinctList<TKey, T>(this, f);
+        }
+
+        /**
+         * Ensures no element of {@link other} shows up in the list.
+         * Every time the iteration starts, {@link other} is completely calculated
+         * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
+         */
+        except<TKey = T>(other: Iterable<TKey>, f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) {
+            return new LazyExceptList<TKey, T>(this, other, f);
         }
 
         /**
@@ -103,7 +128,7 @@ namespace LazyList {
          * Converts the current list to an iterables list based on {@link f} and concats every element
          * @param f A conversion function; Can be omitted if every element is iterable
          */
-        selectMany<TResult>(f?: Convert<T, Iterable<TResult>, LazySelectManyList<T, TResult>>) {
+        selectMany<TResult = T extends Iterable<infer U> ? U : never>(f?: Convert<T, Iterable<TResult>, LazySelectManyList<T, TResult>>) {
             return new LazySelectManyList<T, TResult>(this, f);
         }
  
@@ -212,7 +237,7 @@ namespace LazyList {
          * @param f A combination function
          * @param mode Different length handling
          */
-        zip<TOther, TResult>(other: Iterable<TOther>, f?: Combine<T, TOther, TResult, LazyZipList<T, TOther, TResult>>, mode?: JoinMode) {
+        zip<TOther, TResult = [ T, TOther ]>(other: Iterable<TOther>, f?: Combine<T, TOther, TResult, LazyZipList<T, TOther, TResult>>, mode?: JoinMode) {
             return new LazyZipList<T, TOther, TResult>(this, other, f, mode);
         }
 
@@ -228,7 +253,7 @@ namespace LazyList {
          * @param f A combination function
          * @param mode Different length handling
          */
-        join<TOther, TResult>(other: Iterable<TOther>, p?: Combine<T, TOther, boolean, LazyJoinList<T, TOther, TResult>>, f?: Combine<T, TOther, TResult, LazyJoinList<T, TOther, TResult>>, mode?: JoinMode) {
+        join<TOther, TResult = [ T, TOther ]>(other: Iterable<TOther>, p?: Combine<T, TOther, boolean, LazyJoinList<T, TOther, TResult>>, f?: Combine<T, TOther, TResult, LazyJoinList<T, TOther, TResult>>, mode?: JoinMode) {
             return new LazyJoinList<T, TOther, TResult>(this, other, p, f, mode);
         }
 
@@ -255,6 +280,24 @@ namespace LazyList {
          */
         split(n: number, mode?: JoinMode | boolean, lazy?: boolean) {
             return new LazySplitList(this, n, mode, lazy);
+        }
+
+        /**
+         * Returns a {@link LazySet} that contains the elements of the list.
+         * The set is lazy, this means that the elements are not calculated until it is checked if they are present
+         */
+        toSet() {
+            return new LazySet(this);
+        }
+
+        /**
+         * Returns a {@link LazyMap} that contains the elements of the list.
+         * The map is lazy, this means that the elements are not calculated until it is checked if they are present or the key is requested
+         * @param getK The function that will be used to get the key of each element
+         * @param getV The function that will be used to get the value of each element; If not provided the element itself will be used
+         */
+        toMap<K, V = T>(getK: Convert<T, K, LazyMap<T, K, V>>, getV?: Convert<T, V, LazyMap<T, K, V>>) {
+            return new LazyMap(this, getK, getV);
         }
 
         /** Caches the list's calculated elements, this prevent them from passing inside the pipeline again */
@@ -499,6 +542,11 @@ namespace LazyList {
         get value() {
             return Array.from(this);
         }
+
+        /** Returns the length of the iterable if it is easy to compute, otherwise it returns `-1` */
+        get fastCount() {
+            return -1;
+        }
     }
 
     /**
@@ -524,17 +572,11 @@ namespace LazyList {
 
     /**
      * Output of {@link LazyList}.
-     * Instances of this class have the {@link fastCount} property, which returns the length of the iterable if it is easy to compute, otherwise it returns `-1`
+     * Represents a list with the same number of elements as {@link source}
      */
     export class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
         get fastCount(): number {
-            return this.source == null
-                    ? 0
-                : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
-                    ? this.source.length
-                : this.source instanceof LazyFixedList
-                    ? this.source.fastCount
-                    : -1;
+            return fastCount(this.source);
         }
     }
 
@@ -548,7 +590,7 @@ namespace LazyList {
                 this.end *= -1;
         }
 
-        *[Symbol.iterator](): Iterator<number> {
+        *[Symbol.iterator]() {
             if (this.flip)
                 for (let i = this.end - 1; i >= this.start; i -= this.step)
                     yield i;
@@ -571,6 +613,19 @@ namespace LazyList {
             const set = new Set<TKey>();
             for (const elm of this.source)
                 if (set.size != set.add(this.f ? this.f(elm, i++, this) : <any>elm).size)
+                    yield elm;
+        }
+    }
+
+    /** Output of {@link except} */
+    export class LazyExceptList<TKey, T> extends LazySourceList<T, T> {
+        constructor (source: Iterable<T>, public other: Iterable<TKey>, public f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) { super(source); }
+
+        *[Symbol.iterator]() {
+            var i = 0;
+            const set = new Set<TKey>(this.other);
+            for (const elm of this.source)
+                if (!set.has(this.f ? this.f(elm, i++, this) : <any>elm))
                     yield elm;
         }
     }
@@ -641,7 +696,7 @@ namespace LazyList {
         }
     }
 
-    /** Output of {@link append} */
+    /** Output of {@link append} and {@link prepend} */
     export class LazyAppendList<T> extends LazyFixedList<T, T> {
         constructor (source: Iterable<T>, public v: T, public flip: boolean = false) { super(source); }
 
@@ -694,8 +749,6 @@ namespace LazyList {
 
     /** Output of {@link reverse} */
     export class LazyReverseList<T> extends LazyFixedList<T, T> {
-        constructor (source: Iterable<T>) { super(source); }
-
         *[Symbol.iterator]() {
             const temp = this.base();
             for (var i = temp.length - 1; i >= 0; i--)
@@ -943,30 +996,147 @@ namespace LazyList {
                     : temp.calc();
             }
         }
-    }    
+    }
 
-    /** Output of {@link cache} */
-    export class LazyCacheList<T> extends LazyFixedList<T, T> {
-        #iter: Iterator<T>;
-        result: T[] = [];
+    /** Common functionalities of cached lists */
+    export abstract class LazyAbstractCacheList<I, O, TCache extends Iterable<O>> extends LazySourceList<I, O> {
+        #iter: Iterator<I>;
         done: boolean = false;
-        constructor (source: Iterable<T>) { super(source); }
 
         *[Symbol.iterator]() {
-            for (var i = 0; i < this.result.length; i++)
-                yield this.result[i];
-
-            for (var value: T; !({ value, done: this.done } = this.iter.next()).done; )
-                yield this.result[i++] = value;
+            yield* this.cached;
+            yield* this.calcRest();
         }
+
+        /** Calculates the remaining elements one at a time */
+        *calcRest(): Generator<O> {
+            for (var value: I; !({ value, done: this.done } = this.iter.next()).done; )
+                yield this.save(value);
+        }
+
+        has(value?: O) {
+            if (!arguments.length)
+                return this.done ? this.saved > 0 : super.has();
+            return super.has(value);
+        }
+
+        /** Completes the cache and returns it */
+        complete() {
+            for (const _ of this.calcRest());
+            return this.cached;
+        }
+
+        /** Saves an element to the cache */
+        abstract save(value: I): O;
+
+        get fastCount() {
+            return this.done
+                ? this.saved
+                : -1;
+        }
+
+        /** The iterator to cache */
+        get iter() {
+            return this.#iter ??= this.source[Symbol.iterator]();
+        }
+
+        /** The cached elements */
+        abstract get cached(): TCache;
+        
+        /** The number of elements in the cache */
+        abstract get saved(): number;
+    }
+
+    /** Output of {@link toSet} */
+    export class LazySet<T> extends LazyAbstractCacheList<T, T, Set<T>> {
+        cached: Set<T> = new Set<T>();
+    
+        has(value?: T) {
+            if (!arguments.length)
+                return super.has();
+    
+            if (this.cached.has(value))
+                return true;
+    
+            for (const elm of this.calcRest())
+                if (elm === value)
+                    return true;
+    
+            return false;
+        }
+    
+        add(value: T) {
+            this.save(value);
+            return this;
+        }
+    
+        save(value: T) {
+            this.cached.add(value);
+            return value;
+        }
+    
+        get saved() {
+            return this.cached.size;
+        }
+    }
+    
+    /** Output of {@link toMap} */
+    export class LazyMap<T, K, V> extends LazyAbstractCacheList<T, [ K, V ], Map<K, V>> {
+        processed: number = 0;
+        cached: Map<K, V> = new Map<K, V>();
+        constructor (source: Iterable<T>, public getK: Convert<T, K, LazyMap<T, K, V>>, public getV?: Convert<T, V, LazyMap<T, K, V>>) { super(source); }
+    
+        hasKey(value: K) {
+            if (this.cached.has(value))
+                return true;
+    
+            for (const [ k ] of this.calcRest())
+                if (k === value)
+                    return true;
+    
+            return false;
+        }
+    
+        get(key: K) {
+            if (this.cached.has(key))
+                return this.cached.get(key);
+    
+            for (const [ k, v ] of this.calcRest())
+                if (k === key)
+                    return v;
+    
+            return undefined;
+        }
+    
+        set(key: K, value: V) {
+            this.cached.set(key, value);
+            return this;
+        }
+    
+        save(value: T) {
+            const k = this.getK(value, this.processed, this);
+            const v = this.getV ? this.getV(value, this.processed, this) : <any>value;
+            this.cached.set(k, v);
+            this.processed++;
+            return <[ K, V ]>[ k, v ];
+        }
+    
+        get saved() {
+            return this.cached.size;
+        }
+    }
+
+    /** Output of {@link cache} */
+    export class LazyCacheList<T> extends LazyAbstractCacheList<T, T, T[]> {
+        cached: T[] = [];
 
         at(n: number, def: T = null) {
             return n < 0
                 ? this.done
-                    ? this.at(this.result.length + n, def)
+                    ? this.at(this.cached.length + n, def)
                     : super.at(n, def)
-                : n < this.result.length
-                    ? this.result[n]
+                : n < this.cached.length
+                    ? this.cached[n]
                 : this.done
                     ? def
                     : super.at(n, def);
@@ -974,18 +1144,23 @@ namespace LazyList {
 
         last(def: T = null) {
             return this.done
-                ? this.result[this.result.length - 1]
+                ? this.cached[this.cached.length - 1]
                 : super.last(def);
+        }
+
+        save(value: T) {
+            this.cached.push(value);
+            return value;
         }
 
         get fastCount() {
             return this.done
-                ? this.result.length
-                : super.fastCount;
+                ? this.saved
+                : fastCount(this.source);
         }
 
-        get iter() {
-            return this.#iter ??= this.source[Symbol.iterator]();
+        get saved() {
+            return this.cached.length;
         }
     }
 }

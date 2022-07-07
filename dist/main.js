@@ -20,7 +20,7 @@ function LazyList(source) {
         : new LazyList.LazyFixedList(source);
 }
 (function (LazyList) {
-    var _LazyCacheList_iter;
+    var _LazyAbstractCacheList_iter;
     LazyList.from = LazyList;
     /** Indicates how two iterable should be conbined it they have different sizes */
     let JoinMode;
@@ -45,6 +45,22 @@ function LazyList(source) {
     }
     LazyList.attachIterator = attachIterator;
     /**
+     * Returns the length of the iterable if it is easy to compute, otherwise it returns `-1`
+     * @param source The iterable from which to get the count
+     */
+    function fastCount(source) {
+        return source == null
+            ? 0
+            : typeof source === "string" || source instanceof String || source instanceof Array
+                ? source.length
+                : source instanceof Set || source instanceof Map
+                    ? source.size
+                    : source instanceof LazyList.LazyAbstractList
+                        ? source.fastCount
+                        : -1;
+    }
+    LazyList.fastCount = fastCount;
+    /**
      * Returns an auto-generated list of numbers
      * @param end The end of the sequence
      * @param start The begin of the sequence
@@ -63,6 +79,14 @@ function LazyList(source) {
          */
         distinct(f) {
             return new LazyDistinctList(this, f);
+        }
+        /**
+         * Ensures no element of {@link other} shows up in the list.
+         * Every time the iteration starts, {@link other} is completely calculated
+         * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
+         */
+        except(other, f) {
+            return new LazyExceptList(this, other, f);
         }
         /**
          * Filters the list based on {@link f}
@@ -228,6 +252,22 @@ function LazyList(source) {
          */
         split(n, mode, lazy) {
             return new LazySplitList(this, n, mode, lazy);
+        }
+        /**
+         * Returns a {@link LazySet} that contains the elements of the list.
+         * The set is lazy, this means that the elements are not calculated until it is checked if they are present
+         */
+        toSet() {
+            return new LazySet(this);
+        }
+        /**
+         * Returns a {@link LazyMap} that contains the elements of the list.
+         * The map is lazy, this means that the elements are not calculated until it is checked if they are present or the key is requested
+         * @param getK The function that will be used to get the key of each element
+         * @param getV The function that will be used to get the value of each element; If not provided the element itself will be used
+         */
+        toMap(getK, getV) {
+            return new LazyMap(this, getK, getV);
         }
         /** Caches the list's calculated elements, this prevent them from passing inside the pipeline again */
         cache() {
@@ -441,6 +481,10 @@ function LazyList(source) {
         get value() {
             return Array.from(this);
         }
+        /** Returns the length of the iterable if it is easy to compute, otherwise it returns `-1` */
+        get fastCount() {
+            return -1;
+        }
     }
     LazyList.LazyAbstractList = LazyAbstractList;
     /**
@@ -467,17 +511,11 @@ function LazyList(source) {
     LazyList.LazySourceList = LazySourceList;
     /**
      * Output of {@link LazyList}.
-     * Instances of this class have the {@link fastCount} property, which returns the length of the iterable if it is easy to compute, otherwise it returns `-1`
+     * Represents a list with the same number of elements as {@link source}
      */
     class LazyFixedList extends LazySourceList {
         get fastCount() {
-            return this.source == null
-                ? 0
-                : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
-                    ? this.source.length
-                    : this.source instanceof LazyFixedList
-                        ? this.source.fastCount
-                        : -1;
+            return fastCount(this.source);
         }
     }
     LazyList.LazyFixedList = LazyFixedList;
@@ -521,6 +559,22 @@ function LazyList(source) {
         }
     }
     LazyList.LazyDistinctList = LazyDistinctList;
+    /** Output of {@link except} */
+    class LazyExceptList extends LazySourceList {
+        constructor(source, other, f) {
+            super(source);
+            this.other = other;
+            this.f = f;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            const set = new Set(this.other);
+            for (const elm of this.source)
+                if (!set.has(this.f ? this.f(elm, i++, this) : elm))
+                    yield elm;
+        }
+    }
+    LazyList.LazyExceptList = LazyExceptList;
     /** Output of {@link where} */
     class LazyWhereList extends LazySourceList {
         constructor(source, p) {
@@ -598,7 +652,7 @@ function LazyList(source) {
         }
     }
     LazyList.LazyMergeList = LazyMergeList;
-    /** Output of {@link append} */
+    /** Output of {@link append} and {@link prepend} */
     class LazyAppendList extends LazyFixedList {
         constructor(source, v, flip = false) {
             super(source);
@@ -656,7 +710,6 @@ function LazyList(source) {
     LazyList.LazyRepeatList = LazyRepeatList;
     /** Output of {@link reverse} */
     class LazyReverseList extends LazyFixedList {
-        constructor(source) { super(source); }
         *[Symbol.iterator]() {
             const temp = this.base();
             for (var i = temp.length - 1; i >= 0; i--)
@@ -916,43 +969,147 @@ function LazyList(source) {
         }
     }
     LazyList.LazySplitList = LazySplitList;
-    /** Output of {@link cache} */
-    class LazyCacheList extends LazyFixedList {
-        constructor(source) {
-            super(source);
-            _LazyCacheList_iter.set(this, void 0);
-            this.result = [];
+    /** Common functionalities of cached lists */
+    class LazyAbstractCacheList extends LazySourceList {
+        constructor() {
+            super(...arguments);
+            _LazyAbstractCacheList_iter.set(this, void 0);
             this.done = false;
         }
-        *[(_LazyCacheList_iter = new WeakMap(), Symbol.iterator)]() {
-            for (var i = 0; i < this.result.length; i++)
-                yield this.result[i];
+        *[(_LazyAbstractCacheList_iter = new WeakMap(), Symbol.iterator)]() {
+            yield* this.cached;
+            yield* this.calcRest();
+        }
+        /** Calculates the remaining elements one at a time */
+        *calcRest() {
             for (var value; !({ value, done: this.done } = this.iter.next()).done;)
-                yield this.result[i++] = value;
+                yield this.save(value);
+        }
+        has(value) {
+            if (!arguments.length)
+                return this.done ? this.saved > 0 : super.has();
+            return super.has(value);
+        }
+        /** Completes the cache and returns it */
+        complete() {
+            for (const _ of this.calcRest())
+                ;
+            return this.cached;
+        }
+        get fastCount() {
+            return this.done
+                ? this.saved
+                : -1;
+        }
+        /** The iterator to cache */
+        get iter() {
+            return __classPrivateFieldSet(this, _LazyAbstractCacheList_iter, __classPrivateFieldGet(this, _LazyAbstractCacheList_iter, "f") ?? this.source[Symbol.iterator](), "f");
+        }
+    }
+    LazyList.LazyAbstractCacheList = LazyAbstractCacheList;
+    /** Output of {@link toSet} */
+    class LazySet extends LazyAbstractCacheList {
+        constructor() {
+            super(...arguments);
+            this.cached = new Set();
+        }
+        has(value) {
+            if (!arguments.length)
+                return super.has();
+            if (this.cached.has(value))
+                return true;
+            for (const elm of this.calcRest())
+                if (elm === value)
+                    return true;
+            return false;
+        }
+        add(value) {
+            this.save(value);
+            return this;
+        }
+        save(value) {
+            this.cached.add(value);
+            return value;
+        }
+        get saved() {
+            return this.cached.size;
+        }
+    }
+    LazyList.LazySet = LazySet;
+    /** Output of {@link toMap} */
+    class LazyMap extends LazyAbstractCacheList {
+        constructor(source, getK, getV) {
+            super(source);
+            this.getK = getK;
+            this.getV = getV;
+            this.processed = 0;
+            this.cached = new Map();
+        }
+        hasKey(value) {
+            if (this.cached.has(value))
+                return true;
+            for (const [k] of this.calcRest())
+                if (k === value)
+                    return true;
+            return false;
+        }
+        get(key) {
+            if (this.cached.has(key))
+                return this.cached.get(key);
+            for (const [k, v] of this.calcRest())
+                if (k === key)
+                    return v;
+            return undefined;
+        }
+        set(key, value) {
+            this.cached.set(key, value);
+            return this;
+        }
+        save(value) {
+            const k = this.getK(value, this.processed, this);
+            const v = this.getV ? this.getV(value, this.processed, this) : value;
+            this.cached.set(k, v);
+            this.processed++;
+            return [k, v];
+        }
+        get saved() {
+            return this.cached.size;
+        }
+    }
+    LazyList.LazyMap = LazyMap;
+    /** Output of {@link cache} */
+    class LazyCacheList extends LazyAbstractCacheList {
+        constructor() {
+            super(...arguments);
+            this.cached = [];
         }
         at(n, def = null) {
             return n < 0
                 ? this.done
-                    ? this.at(this.result.length + n, def)
+                    ? this.at(this.cached.length + n, def)
                     : super.at(n, def)
-                : n < this.result.length
-                    ? this.result[n]
+                : n < this.cached.length
+                    ? this.cached[n]
                     : this.done
                         ? def
                         : super.at(n, def);
         }
         last(def = null) {
             return this.done
-                ? this.result[this.result.length - 1]
+                ? this.cached[this.cached.length - 1]
                 : super.last(def);
+        }
+        save(value) {
+            this.cached.push(value);
+            return value;
         }
         get fastCount() {
             return this.done
-                ? this.result.length
-                : super.fastCount;
+                ? this.saved
+                : fastCount(this.source);
         }
-        get iter() {
-            return __classPrivateFieldSet(this, _LazyCacheList_iter, __classPrivateFieldGet(this, _LazyCacheList_iter, "f") ?? this.source[Symbol.iterator](), "f");
+        get saved() {
+            return this.cached.length;
         }
     }
     LazyList.LazyCacheList = LazyCacheList;

@@ -50,14 +50,16 @@ For the details look at the JSDocs.
 - (getter) **`max`**: Returns the biggest number in the list
 - (getter) **`min`**: Returns the smallest number in the list
 - (getter) **`value`**: Calculates each element of the list and puts them inside of an `Array`
-- (getter | only in `LazyFixedList`) **`fastCount`**: Returns the length of the current list if it is easy to compute, `-1` otherwise
+- (getter) **`fastCount`**: Returns the length of the current list if it is easy to compute, `-1` otherwise
 
 ### **Lists**
 Methods that generate other `LazyList`s
 - (static & hack) **`attachIterator`**: Makes every `Generator` a `LazyList` and returns the module for chaining
+- (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`distinct`**: Ensures every element of the current list shows up only once
+- **`except`**: Ensures no element of the given iterable shows up in the current list
 - **`where`**: Filters the list based on a provided function
 - **`when`**: If a given predicate matches on an element, it gets converted by a convertion function, otherwise by an (eventual) other
 - **`select`**: Converts the list based on a provided function
@@ -77,6 +79,8 @@ Methods that generate other `LazyList`s
 - **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
 - (non lazy) **`groupBy`**: Groups the list's elements based on a provided function
 - (non lazy | unsafe) **`split`**: Groups the list's elements, `n` at a time; Passing `true` as the `lazy` argument will make the list lazy but unsafe
+- **`toSet`**: Returns a set that contains the elements of the current list
+- **`toMap`**: Returns a map that contains the elements of the current list
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
 - (non lazy) **`calc`**: Calculates each element of the list and wraps them in another `LazyList`
 - (non lazy) **`await`**: Calculates and awaits each element of the list and wraps them in another `LazyList`
