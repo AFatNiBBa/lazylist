@@ -44,7 +44,7 @@ namespace LazyList {
      * Makes every {@link Generator} extend from {@link LazyList.LazyAbstractList}
      * @returns The library itself
      */
-     export function attachIterator() {
+    export function attachIterator() {
         //@ts-ignore
         (function*(){})().__proto__.__proto__.__proto__.__proto__ = LazyAbstractList.prototype;
         return LazyList;
