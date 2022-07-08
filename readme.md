@@ -54,7 +54,7 @@ For the details look at the JSDocs.
 
 ### **Lists**
 Methods that generate other `LazyList`s
-- (static & hack) **`attachIterator`**: Makes every `Generator` a `LazyList` and returns the module for chaining
+- (static & hack) **`attachIterator`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
 - (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
@@ -62,6 +62,7 @@ Methods that generate other `LazyList`s
 - **`except`**: Ensures no element of the given iterable shows up in the current list
 - **`where`**: Filters the list based on a provided function
 - **`when`**: If a given predicate matches on an element, it gets converted by a convertion function, otherwise by an (eventual) other
+- **`case`**: If a given predicate does NOT match on an element, it gets yielded, otherwise it gets passed into a function and it gets filtered out
 - **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concats the (iterable) outputs of a provided function that will be applied to each element of the list
 - **`merge`**: Concats the current list to an iterable
@@ -88,8 +89,9 @@ Methods that generate other `LazyList`s
 - **`catch`**: Applies a "catch" function to each element of the current list (whose elements should be promises)
 - **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
 - **`ofType`**: Filters the list returning only the elements which are instances of the given constructor
-- **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)
 - **`assign`**: Executes `Object.assign()` on each element passing the given object as the second parameter
+- **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)
+- **`forEach`**: Executes `f` on each element of the list forcing it to be entirely calculated 
 - **`slice`**: Returns a section of the current list
 
 ## Generators as lazy lists
@@ -107,4 +109,9 @@ require("lazylist.js").attachIterator();
 const a = [ 1, 2, 3 ][Symbol.iterator]().cache().where(x => x < 3).select(x => x * 2);
 console.log(a.value); //=> [ 2, 4 ]
 console.log(a.value); //=> [ 2, 4 ]
+```
+The `attachIterator()` function can additionally be used to make ANYTHING extend from `LazyList`, you just need to pass the class as the argument like so:
+```js
+require("lazylist.js").attachIterator(Array);
+console.log([ 1, 2, 3 ].select(x => x + 1).value); //=> [ 2, 3, 4 ]
 ```

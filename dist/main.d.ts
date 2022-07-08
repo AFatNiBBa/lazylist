@@ -31,10 +31,11 @@ declare namespace LazyList {
         outer = 3
     }
     /**
-     * Makes every {@link Generator} extend from {@link LazyList.LazyAbstractList}
+     * Makes {@link ctor} extend from {@link LazyList.LazyAbstractList}
+     * @param ctor The constructor to which you want to change the base class; If not provided, it will apply the functionalities to {@link Generator}
      * @returns The library itself
      */
-    function attachIterator(): typeof LazyList;
+    function attachIterator(ctor?: abstract new (...args: any[]) => any): typeof LazyList;
     /**
      * Returns the length of the iterable if it is easy to compute, otherwise it returns `-1`
      * @param source The iterable from which to get the count
@@ -74,6 +75,12 @@ declare namespace LazyList {
          * @param e A conversion function; If no function is given, the current element will be yielded without modifications
          */
         when(p: Predicate<T, LazyWhenList<T>>, f: Convert<T, T, LazyWhenList<T>>, e?: Convert<T, T, LazyWhenList<T>>): LazyWhenList<T>;
+        /**
+         * If {@link p} does NOT match on an element, it gets yielded, otherwise it gets passed into {@link f} and it gets filtered out
+         * @param p A predicate function
+         * @param f A function
+         */
+        case(p: Predicate<T, LazyCaseList<T>>, f: Convert<T, void, LazyCaseList<T>>): LazyCaseList<T>;
         /**
          * Converts the list based on {@link f}
          * @param f A conversion function
@@ -225,15 +232,21 @@ declare namespace LazyList {
          */
         ofType<TResult extends T>(ctor: new (...args: any[]) => TResult): LazyWhereList<TResult>;
         /**
+         * Executes {@link Object.assign} on each element passing {@link obj} as the second parameter
+         * @param obj An object
+         */
+        assign<TMap>(obj: TMap): LazySelectList<T, T & TMap>;
+        /**
          * Executes {@link f} on each element of the list and returns the current element (not the output of {@link f})
          * @param f A function
          */
         but(f: Convert<T, void, LazySelectList<T, T>>): LazySelectList<T, T>;
         /**
-         * Executes {@link Object.assign} on each element passing {@link obj} as the second parameter
-         * @param obj An object
+         * Executes {@link f} on each element of the list forcing it to be entirely calculated.
+         * If no argument is provided, the list will be just calculated
+         * @param f A function
          */
-        assign<TMap>(obj: TMap): LazySelectList<T, T & TMap>;
+        forEach(f?: Convert<T, void, LazyAbstractList<T>>): void;
         /**
          * Returns a section of the list, starting at {@link start} and with {@link length} elements
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
@@ -367,6 +380,13 @@ declare namespace LazyList {
         f: Convert<T, T, LazyWhenList<T>>;
         e?: Convert<T, T, LazyWhenList<T>>;
         constructor(source: Iterable<T>, p: Predicate<T, LazyWhenList<T>>, f: Convert<T, T, LazyWhenList<T>>, e?: Convert<T, T, LazyWhenList<T>>);
+        [Symbol.iterator](): Generator<T, void, unknown>;
+    }
+    /** Output of {@link case} */
+    class LazyCaseList<T> extends LazySourceList<T, T> {
+        p: Predicate<T, LazyCaseList<T>>;
+        f: Convert<T, void, LazyCaseList<T>>;
+        constructor(source: Iterable<T>, p: Predicate<T, LazyCaseList<T>>, f: Convert<T, void, LazyCaseList<T>>);
         [Symbol.iterator](): Generator<T, void, unknown>;
     }
     /** Output of {@link select} */

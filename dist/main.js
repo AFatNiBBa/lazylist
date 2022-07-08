@@ -35,12 +35,13 @@ function LazyList(source) {
         JoinMode[JoinMode["outer"] = 3] = "outer";
     })(JoinMode = LazyList.JoinMode || (LazyList.JoinMode = {}));
     /**
-     * Makes every {@link Generator} extend from {@link LazyList.LazyAbstractList}
+     * Makes {@link ctor} extend from {@link LazyList.LazyAbstractList}
+     * @param ctor The constructor to which you want to change the base class; If not provided, it will apply the functionalities to {@link Generator}
      * @returns The library itself
      */
-    function attachIterator() {
+    function attachIterator(ctor) {
         //@ts-ignore
-        (function* () { })().__proto__.__proto__.__proto__.__proto__ = LazyAbstractList.prototype;
+        (ctor?.prototype ?? (function* () { })().__proto__.__proto__.__proto__).__proto__ = LazyAbstractList.prototype;
         return LazyList;
     }
     LazyList.attachIterator = attachIterator;
@@ -103,6 +104,14 @@ function LazyList(source) {
          */
         when(p, f, e) {
             return new LazyWhenList(this, p, f, e);
+        }
+        /**
+         * If {@link p} does NOT match on an element, it gets yielded, otherwise it gets passed into {@link f} and it gets filtered out
+         * @param p A predicate function
+         * @param f A function
+         */
+        case(p, f) {
+            return new LazyCaseList(this, p, f);
         }
         /**
          * Converts the list based on {@link f}
@@ -307,6 +316,13 @@ function LazyList(source) {
             return new LazyWhereList(this, x => x instanceof ctor);
         }
         /**
+         * Executes {@link Object.assign} on each element passing {@link obj} as the second parameter
+         * @param obj An object
+         */
+        assign(obj) {
+            return new LazySelectList(this, x => Object.assign(x, obj));
+        }
+        /**
          * Executes {@link f} on each element of the list and returns the current element (not the output of {@link f})
          * @param f A function
          */
@@ -314,11 +330,14 @@ function LazyList(source) {
             return new LazySelectList(this, (x, i, list) => (f(x, i, list), x));
         }
         /**
-         * Executes {@link Object.assign} on each element passing {@link obj} as the second parameter
-         * @param obj An object
+         * Executes {@link f} on each element of the list forcing it to be entirely calculated.
+         * If no argument is provided, the list will be just calculated
+         * @param f A function
          */
-        assign(obj) {
-            return new LazySelectList(this, x => Object.assign(x, obj));
+        forEach(f) {
+            var i = 0;
+            for (const elm of this)
+                f?.(elm, i, this);
         }
         /**
          * Returns a section of the list, starting at {@link start} and with {@link length} elements
@@ -609,6 +628,23 @@ function LazyList(source) {
         }
     }
     LazyList.LazyWhenList = LazyWhenList;
+    /** Output of {@link case} */
+    class LazyCaseList extends LazySourceList {
+        constructor(source, p, f) {
+            super(source);
+            this.p = p;
+            this.f = f;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const elm of this.source)
+                this.p(elm, i, this)
+                    ? this.f(elm, i, this)
+                    : yield elm,
+                    i++;
+        }
+    }
+    LazyList.LazyCaseList = LazyCaseList;
     /** Output of {@link select} */
     class LazySelectList extends LazyFixedList {
         constructor(source, f) {

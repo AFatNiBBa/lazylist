@@ -41,12 +41,13 @@ namespace LazyList {
     }
 
     /**
-     * Makes every {@link Generator} extend from {@link LazyList.LazyAbstractList}
+     * Makes {@link ctor} extend from {@link LazyList.LazyAbstractList}
+     * @param ctor The constructor to which you want to change the base class; If not provided, it will apply the functionalities to {@link Generator}
      * @returns The library itself
      */
-    export function attachIterator() {
+    export function attachIterator(ctor?: abstract new (...args: any[]) => any): typeof LazyList {
         //@ts-ignore
-        (function*(){})().__proto__.__proto__.__proto__.__proto__ = LazyAbstractList.prototype;
+        (ctor?.prototype ?? (function*(){})().__proto__.__proto__.__proto__).__proto__ = LazyAbstractList.prototype;
         return LazyList;
     }
 
@@ -114,6 +115,15 @@ namespace LazyList {
          */
         when(p: Predicate<T, LazyWhenList<T>>, f: Convert<T, T, LazyWhenList<T>>, e?: Convert<T, T, LazyWhenList<T>>) {
             return new LazyWhenList<T>(this, p, f, e);
+        }
+
+        /**
+         * If {@link p} does NOT match on an element, it gets yielded, otherwise it gets passed into {@link f} and it gets filtered out
+         * @param p A predicate function
+         * @param f A function
+         */
+        case(p: Predicate<T, LazyCaseList<T>>, f: Convert<T, void, LazyCaseList<T>>) {
+            return new LazyCaseList<T>(this, p, f);
         }
 
         /**
@@ -345,6 +355,14 @@ namespace LazyList {
         }
 
         /**
+         * Executes {@link Object.assign} on each element passing {@link obj} as the second parameter
+         * @param obj An object
+         */
+        assign<TMap>(obj: TMap) {
+            return new LazySelectList(this, x => Object.assign(x, obj));
+        }
+
+        /**
          * Executes {@link f} on each element of the list and returns the current element (not the output of {@link f})
          * @param f A function
          */
@@ -353,11 +371,14 @@ namespace LazyList {
         }
 
         /**
-         * Executes {@link Object.assign} on each element passing {@link obj} as the second parameter
-         * @param obj An object
+         * Executes {@link f} on each element of the list forcing it to be entirely calculated.
+         * If no argument is provided, the list will be just calculated
+         * @param f A function
          */
-        assign<TMap>(obj: TMap) {
-            return new LazySelectList(this, x => Object.assign(x, obj));
+        forEach(f?: Convert<T, void, LazyAbstractList<T>>) {
+            var i = 0;
+            for (const elm of this)
+                f?.(elm, i, this);
         }
 
         /**
@@ -654,6 +675,20 @@ namespace LazyList {
                     : this.e
                         ? this.e(elm, i, this)
                         : elm,
+                i++;
+        }
+    }
+
+    /** Output of {@link case} */
+    export class LazyCaseList<T> extends LazySourceList<T, T> {
+        constructor (source: Iterable<T>, public p: Predicate<T, LazyCaseList<T>>, public f: Convert<T, void, LazyCaseList<T>>) { super(source); }
+
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const elm of this.source)
+                this.p(elm, i, this)
+                    ? this.f(elm, i, this)
+                    : yield elm,
                 i++;
         }
     }
