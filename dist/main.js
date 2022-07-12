@@ -20,7 +20,7 @@ function LazyList(source) {
         : new LazyList.LazyFixedList(source);
 }
 (function (LazyList) {
-    var _LazyAbstractCacheList_iter;
+    var _LazyStore_iter, _LazyAbstractCacheList_iter;
     LazyList.from = LazyList;
     /** Indicates how two iterable should be conbined it they have different sizes */
     let JoinMode;
@@ -61,6 +61,14 @@ function LazyList(source) {
                         : -1;
     }
     LazyList.fastCount = fastCount;
+    /**
+     * Creates a {@link LazyFixedList} based on a non-iterable iterator
+     * @param iter The iterator
+     */
+    function fromIterator(iter) {
+        return new LazyFixedList({ [Symbol.iterator]: () => iter });
+    }
+    LazyList.fromIterator = fromIterator;
     /**
      * Returns an auto-generated list of numbers
      * @param end The end of the sequence
@@ -112,6 +120,23 @@ function LazyList(source) {
          */
         case(p, f) {
             return new LazyCaseList(this, p, f);
+        }
+        /**
+         * Converts and filters the list based on {@link f} at the same time.
+         * Usage:
+         * ```
+         * LazyList.from([ 1, 2, 3 ]).selectWhere(x => {
+         *    if (x.value % 2) {
+         *        x.result = x.value + 2;
+         *        return true;
+         *    }
+         *    return false;
+         * }).value //=> [ 3, 5 ]
+         * ```
+         * @param f A predicate function that gets a box object containing the element in the `value` field; If the function returns `true`, the content of the box's `result` field will be yielded
+         */
+        selectWhere(f) {
+            return new LazySelectWhereList(this, f);
         }
         /**
          * Converts the list based on {@link f}
@@ -241,6 +266,20 @@ function LazyList(source) {
         }
         /**
          * Groups the list's elements based on a provided function.
+         * Similiar to {@link groupBy}, but the groups cannot be completely iterated until the evalueation is finisced, only what is inside them can.
+         * You can use the {@link LazyStore.get} method to get the desired group like so:
+         * ```
+         * const store = LazyList.from([ 1, 2, 3 ]).storeBy(x => x % 2);
+         * store.get(1).value //=> [ 1, 3 ]
+         * ```
+         * This allows the groups to be lazy
+         * @param f A combination function
+         */
+        storeBy(f) {
+            return new LazyStore(this, f);
+        }
+        /**
+         * Groups the list's elements based on a provided function.
          * Non lazy
          * @param f A combination function
          */
@@ -264,21 +303,26 @@ function LazyList(source) {
         }
         /**
          * Returns a {@link LazySet} that contains the elements of the list.
-         * The set is lazy, this means that the elements are not calculated until it is checked if they are present
+         * The set is lazy, this means that the elements are not calculated until it is checked if they are present.
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} will cause unexpected behaviours (Some elements will not be present)
          */
         toSet() {
             return new LazySet(this);
         }
         /**
          * Returns a {@link LazyMap} that contains the elements of the list.
-         * The map is lazy, this means that the elements are not calculated until it is checked if they are present or the key is requested
+         * The map is lazy, this means that the elements are not calculated until it is checked if they are present or the key is requested.
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyMap} will cause unexpected behaviours (Some elements will not be present)
          * @param getK The function that will be used to get the key of each element
          * @param getV The function that will be used to get the value of each element; If not provided the element itself will be used
          */
         toMap(getK, getV) {
             return new LazyMap(this, getK, getV);
         }
-        /** Caches the list's calculated elements, this prevent them from passing inside the pipeline again */
+        /**
+         * Caches the list's calculated elements, this prevent them from passing inside the pipeline again
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyCacheList} will cause unexpected behaviours (Some elements will not be present)
+         */
         cache() {
             return new LazyCacheList(this);
         }
@@ -468,6 +512,20 @@ function LazyList(source) {
         concat(sep = ",") {
             return this.aggregate((a, b) => `${a}${sep}${b}`);
         }
+        /**
+         * Returns the smallest value in the list
+         * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
+         */
+        min(f) {
+            return this.aggregate((a, b, i, list) => (f ? f(a, b, i, list) < 0 : a < b) ? a : b);
+        }
+        /**
+         * Returns the biggest value in the list
+         * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
+         */
+        max(f) {
+            return this.aggregate((a, b, i, list) => (f ? f(a, b, i, list) > 0 : a > b) ? a : b);
+        }
         /** Aggregates the list using the `+` operator (Can both add numbers and concatenate strings) */
         get sum() {
             //@ts-ignore
@@ -487,14 +545,6 @@ function LazyList(source) {
             for (const _ of this)
                 i++;
             return i;
-        }
-        /** Returns the biggest number in the list */
-        get max() {
-            return this.aggregate((a, b) => a > b ? a : b);
-        }
-        /** Returns the smallest number in the list */
-        get min() {
-            return this.aggregate((a, b) => a < b ? a : b);
         }
         /** Calculates each element of the list and puts them inside of an {@link Array} */
         get value() {
@@ -645,6 +695,22 @@ function LazyList(source) {
         }
     }
     LazyList.LazyCaseList = LazyCaseList;
+    /** Output of {@link selectWhere} */
+    class LazySelectWhereList extends LazySourceList {
+        constructor(source, f) {
+            super(source);
+            this.f = f;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            for (const value of this.source) {
+                const box = { value, result: undefined };
+                if (this.f(box, i++, this))
+                    yield box.result;
+            }
+        }
+    }
+    LazyList.LazySelectWhereList = LazySelectWhereList;
     /** Output of {@link select} */
     class LazySelectList extends LazyFixedList {
         constructor(source, f) {
@@ -953,6 +1019,67 @@ function LazyList(source) {
         }
     }
     LazyList.LazyJoinList = LazyJoinList;
+    /** Output of {@link LazyAbstractList.storeBy} */
+    class LazyStore {
+        constructor(source, f) {
+            this.source = source;
+            this.f = f;
+            this.map = new Map();
+            this.processed = 0;
+            this.done = false;
+            _LazyStore_iter.set(this, void 0);
+        }
+        /**
+         * Returns the list of the elements with the given key
+         * @param k The key to search for
+         */
+        get(k) {
+            var out = this.map.get(k);
+            if (!out)
+                this.map.set(k, out = new LazyStoreByList(k, this, this.f));
+            return out;
+        }
+        /** The iterator to cache */
+        get iter() {
+            return __classPrivateFieldSet(this, _LazyStore_iter, __classPrivateFieldGet(this, _LazyStore_iter, "f") ?? this.source[Symbol.iterator](), "f");
+        }
+    }
+    _LazyStore_iter = new WeakMap();
+    LazyList.LazyStore = LazyStore;
+    /** Output of {@link LazyStore.get} */
+    class LazyStoreByList extends LazyAbstractList {
+        constructor(key, store, f) {
+            super();
+            this.key = key;
+            this.store = store;
+            this.f = f;
+            this.processed = 0;
+            this.cached = [];
+        }
+        *[Symbol.iterator]() {
+            // Pre-cached elements
+            for (var i = 0; i < this.processed; i++)
+                yield this.cached[i];
+            // Elements added by other lists before that this starts
+            yield* this.flush();
+            // Elements added by this list
+            for (var value; !({ value, done: this.store.done } = this.store.iter.next()).done;) {
+                const k = this.f(value, this.store.processed++, this);
+                if (k === this.key) {
+                    yield this.cached[this.processed++] = value;
+                    yield* this.flush(); // Flushes only in this case because the elements can be added by other lists only during yields
+                }
+                else
+                    this.store.get(k).cached.push(value);
+            }
+        }
+        /** Yields the elements that have been cached by other lists in {@link store} */
+        *flush() {
+            for (; this.processed < this.cached.length; this.processed++)
+                yield this.cached[this.processed];
+        }
+    }
+    LazyList.LazyStoreByList = LazyStoreByList;
     /**
      * Element of the output of {@link groupBy}.
      * The group common value is contained in the {@link key} property.

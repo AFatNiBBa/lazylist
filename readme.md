@@ -44,11 +44,11 @@ For the details look at the JSDocs.
 - **`indexOf`**: Returns the index of the provided value in the list if found, `-1` otherwise
 - **`find`**: Returns the index of the first element of the current list for which the provided function returns `true` end the element itself; If nothing is found returns `[ -1, null ]`
 - **`concat`**: Joins the list elements using the given separator
+- **`min`**: Returns the smallest number in the list based on a provided function
+- **`max`**: Returns the biggest number in the list based on a provided function
 - (getter) **`sum`**: Aggregates the list using the `+` operator (Can both add numbers and concatenate strings)
 - (getter) **`avg`**: Calculates the average of the elements of the list
 - (getter) **`count`**: Calculates the length of the list
-- (getter) **`max`**: Returns the biggest number in the list
-- (getter) **`min`**: Returns the smallest number in the list
 - (getter) **`value`**: Calculates each element of the list and puts them inside of an `Array`
 - (getter) **`fastCount`**: Returns the length of the current list if it is easy to compute, `-1` otherwise
 
@@ -57,12 +57,14 @@ Methods that generate other `LazyList`s
 - (static & hack) **`attachIterator`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
 - (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
+- (static) **`fromIterator`**: Creates a `LazyFixedList` based on a non-iterable iterator
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`distinct`**: Ensures every element of the current list shows up only once
 - **`except`**: Ensures no element of the given iterable shows up in the current list
 - **`where`**: Filters the list based on a provided function
 - **`when`**: If a given predicate matches on an element, it gets converted by a convertion function, otherwise by an (eventual) other
 - **`case`**: If a given predicate does NOT match on an element, it gets yielded, otherwise it gets passed into a function and it gets filtered out
+- **`selectWhere`**: Converts and filters the list based on a provided function at the same time
 - **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concats the (iterable) outputs of a provided function that will be applied to each element of the list
 - **`merge`**: Concats the current list to an iterable
@@ -78,6 +80,7 @@ Methods that generate other `LazyList`s
 - (non lazy?) **`take`**: Takes only the first `n` elements of the list (If `n` is negative, it takes from the end but is not lazy)
 - **`zip`**: Combines the current list to an iterable based on a provided function
 - **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
+- **`storeBy`**: Lazy version of `groupBy`, the groups cannot be iterated, only their element can
 - (non lazy) **`groupBy`**: Groups the list's elements based on a provided function
 - (non lazy | unsafe) **`split`**: Groups the list's elements, `n` at a time; Passing `true` as the `lazy` argument will make the list lazy but unsafe
 - **`toSet`**: Returns a set that contains the elements of the current list
