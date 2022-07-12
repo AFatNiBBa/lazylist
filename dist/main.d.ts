@@ -556,7 +556,8 @@ declare namespace LazyList {
         done: boolean;
         constructor(source: Iterable<T>, f: Convert<T, TKey, LazyStoreByList<TKey, T>>);
         /**
-         * Returns the list of the elements with the given key
+         * Returns the list of the elements with the given key.
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} will cause unexpected behaviours (Some elements will not be present)
          * @param k The key to search for
          */
         get(k: TKey): LazyStoreByList<TKey, T>;

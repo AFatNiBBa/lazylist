@@ -1030,7 +1030,8 @@ function LazyList(source) {
             _LazyStore_iter.set(this, void 0);
         }
         /**
-         * Returns the list of the elements with the given key
+         * Returns the list of the elements with the given key.
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} will cause unexpected behaviours (Some elements will not be present)
          * @param k The key to search for
          */
         get(k) {
