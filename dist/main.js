@@ -80,6 +80,16 @@ function LazyList(source) {
         return new LazyRangeList(end, start, step, flip);
     }
     LazyList.range = range;
+    /**
+     * Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range.
+     * Can be freely accessed by index
+     * @param f A function that generates a chunk of data starting from the given index
+     * @param offset If an index is out of range, the loaded chunk will start this amount of elements before the index
+     */
+    function buffer(f, offset) {
+        return new LazyBufferList(f, offset);
+    }
+    LazyList.buffer = buffer;
     /** An iterable wrapper with helper functions */
     class LazyAbstractList {
         /**
@@ -235,10 +245,20 @@ function LazyList(source) {
         /**
          * Takes the first {@link p} elements of the list and skips the rest
          * @param p The elements to take (Use a negative number to take from the end); If a function is given, it will be called for each element and the elements will be taken until the function returns `false`
-         * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many `undefined` as needed
+         * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many {@link def} as needed
+         * @param def The value to use if the list is too short
          */
-        take(p, mode) {
-            return new LazyTakeList(this, p, mode);
+        take(p, mode, def) {
+            return new LazyTakeList(this, p, mode, def);
+        }
+        /**
+         * Force the list to have at least {@link n} elements by concatenating as many {@link def} as needed at the beginning of the list.
+         * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument)
+         * @param n The number of desired elements
+         * @param def The value to use if the list is too short
+         */
+        padStart(n, def) {
+            return new LazyPadStartList(this, n, def);
         }
         /**
          * Combines the current list with {@link other} based on {@link f}
@@ -289,17 +309,19 @@ function LazyList(source) {
         /**
          * Groups the list's elements, {@link n} at a time.
          * Non lazy by default (It calculates {@link n} elements at a time), but can be made lazy by setting {@link lazy} as `true`.
+         * If the list is set to lazy there could be an empty (Even if {@link mode} is truthy) group at the end of the list, this is because there is no way of checking if the iteration has finisced at that point.
          * If the list is set to lazy you should NEVER calculate the parent iterator before the childrens, like:
          * ```
          * LazyList.from([ 1, 2, 3 ]).split(2, false, true).value; // Stops
          * ```
          * Additionally a lot of unexpected behaviours could occur
          * @param n The length of each slice
-         * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many `undefined` as needed
+         * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many {@link def} as needed
          * @param lazy Indicates if the list should be lazy (and unsafe)
+         * @param def The value to use if the list is too short
          */
-        split(n, mode, lazy) {
-            return new LazySplitList(this, n, mode, lazy);
+        split(n, mode, lazy, def) {
+            return new LazySplitList(this, n, mode, lazy, def);
         }
         /**
          * Returns a {@link LazySet} that contains the elements of the list.
@@ -613,6 +635,41 @@ function LazyList(source) {
         }
     }
     LazyList.LazyRangeList = LazyRangeList;
+    /** Output of {@link buffer} */
+    class LazyBufferList extends LazyAbstractList {
+        constructor(f, offset = 0) {
+            super();
+            this.f = f;
+            this.offset = offset;
+            this.start = 0;
+            this.buffer = [];
+        }
+        *[Symbol.iterator]() {
+            for (var i = 0; this.tryBuffer(i); i++)
+                yield this.buffer[i - this.start];
+        }
+        at(n, def) {
+            return this.tryBuffer(n)
+                ? this.buffer[n - this.start]
+                : def;
+        }
+        /**
+         * Tells if the element at the index can be retrieved
+         * @param n The index to check
+         * @param read If false, only the current buffer is checked
+         */
+        tryBuffer(n, read = true) {
+            const real = n - this.start;
+            if (0 <= real && real < this.buffer.length)
+                return true;
+            if (!read)
+                return false;
+            this.start = Math.max(0, n - this.offset);
+            this.buffer = this.f(this.start, this);
+            return this.tryBuffer(n, false);
+        }
+    }
+    LazyList.LazyBufferList = LazyBufferList;
     /** Output of {@link distinct} */
     class LazyDistinctList extends LazySourceList {
         constructor(source, f) {
@@ -917,15 +974,19 @@ function LazyList(source) {
     LazyList.LazySkipList = LazySkipList;
     /** Output of {@link LazyAbstractList.take} */
     class LazyTakeList extends LazySourceList {
-        constructor(source, p, mode = false) {
+        constructor(source, p, mode = false, def = undefined) {
             super(source);
             this.p = p;
             this.mode = mode;
+            this.def = def;
         }
-        static *take(iter, n, mode = false) {
+        static *take(iter, n, mode = false, def = undefined) {
             for (var value, i = 0; i < n; i++) // If this were a foreach loop the first element after "n" would have been calculated too
-                if ((iter.done = ({ value } = iter.next()).done) && !mode)
-                    break;
+                if (iter.done = ({ value } = iter.next()).done)
+                    if (!mode)
+                        break;
+                    else
+                        yield def;
                 else
                     yield value;
         }
@@ -936,7 +997,7 @@ function LazyList(source) {
                     yield* LazySkipList.skip(temp[Symbol.iterator](), temp.length + this.p);
                 }
                 else
-                    yield* LazyTakeList.take(this.source[Symbol.iterator](), this.p, this.mode);
+                    yield* LazyTakeList.take(this.source[Symbol.iterator](), this.p, this.mode, this.def);
                 return;
             }
             let i = 0;
@@ -948,6 +1009,21 @@ function LazyList(source) {
         }
     }
     LazyList.LazyTakeList = LazyTakeList;
+    /** Output of {@link padStart} */
+    class LazyPadStartList extends LazySourceList {
+        constructor(source, n, def = undefined) {
+            super(source);
+            this.n = n;
+            this.def = def;
+        }
+        *[Symbol.iterator]() {
+            const temp = this.base();
+            for (var i = temp.length; i < this.n; i++)
+                yield this.def;
+            yield* temp;
+        }
+    }
+    LazyList.LazyPadStartList = LazyPadStartList;
     /** Output of {@link zip} */
     class LazyZipList extends LazySourceList {
         constructor(source, other, f, mode = JoinMode.inner) {
@@ -1116,19 +1192,24 @@ function LazyList(source) {
     LazyList.LazyGroupByList = LazyGroupByList;
     /** Output of {@link split} */
     class LazySplitList extends LazySourceList {
-        constructor(source, n, mode = false, lazy = false) {
+        constructor(source, n, mode = false, lazy = false, def = undefined) {
             super(source);
             this.n = n;
             this.mode = mode;
             this.lazy = lazy;
+            this.def = def;
         }
         *[Symbol.iterator]() {
             const iter = this.source[Symbol.iterator]();
             while (!iter.done) {
-                const temp = new LazyFixedList(LazyTakeList.take(iter, this.n, this.mode)); // This doesn't use the normal `list.take()` because I would have reconverted "iter" into an iterable
-                yield this.lazy
-                    ? temp
-                    : temp.calc();
+                const lazy = new LazyFixedList(LazyTakeList.take(iter, this.n, this.mode, this.def)); // This doesn't use the normal `list.take()` because I would have reconverted "iter" into an iterable
+                if (!this.lazy) {
+                    const temp = lazy.calc();
+                    if (temp.has()) // If the list is not lazy, it can be checked for emptyness
+                        yield temp;
+                }
+                else
+                    yield lazy;
             }
         }
     }

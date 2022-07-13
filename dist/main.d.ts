@@ -6,6 +6,11 @@
 declare function LazyList<T = any>(source?: Iterable<T>): LazyList.LazyAbstractList<T>;
 declare namespace LazyList {
     const from: typeof LazyList;
+    /** Represents data structure with a numeric indexer and a length that do not need to be writable */
+    type ReadOnlyIndexable<T> = {
+        readonly [k: number]: T;
+        readonly length: number;
+    };
     /** A function that indicates the "truthyness" of a value */
     type Predicate<T, TList = Iterable<T>> = (x: T, i: number, list: TList) => boolean | any;
     /** A function that converts a value */
@@ -54,6 +59,13 @@ declare namespace LazyList {
      * @param flip If `true` the sequence will be reversed (If {@link end} is less than `0` it will be `true` by default)
      */
     function range(end?: number, start?: number, step?: number, flip?: boolean): LazyRangeList;
+    /**
+     * Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range.
+     * Can be freely accessed by index
+     * @param f A function that generates a chunk of data starting from the given index
+     * @param offset If an index is out of range, the loaded chunk will start this amount of elements before the index
+     */
+    function buffer<T>(f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>, offset?: number): LazyBufferList<T>;
     /** An iterable wrapper with helper functions */
     abstract class LazyAbstractList<T> {
         abstract [Symbol.iterator](): Generator<T>;
@@ -177,9 +189,17 @@ declare namespace LazyList {
         /**
          * Takes the first {@link p} elements of the list and skips the rest
          * @param p The elements to take (Use a negative number to take from the end); If a function is given, it will be called for each element and the elements will be taken until the function returns `false`
-         * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many `undefined` as needed
+         * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many {@link def} as needed
+         * @param def The value to use if the list is too short
          */
-        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean): LazyTakeList<T>;
+        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T): LazyTakeList<T>;
+        /**
+         * Force the list to have at least {@link n} elements by concatenating as many {@link def} as needed at the beginning of the list.
+         * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument)
+         * @param n The number of desired elements
+         * @param def The value to use if the list is too short
+         */
+        padStart(n: number, def?: T): LazyPadStartList<T>;
         /**
          * Combines the current list with {@link other} based on {@link f}
          * @param other An iterable
@@ -221,16 +241,18 @@ declare namespace LazyList {
         /**
          * Groups the list's elements, {@link n} at a time.
          * Non lazy by default (It calculates {@link n} elements at a time), but can be made lazy by setting {@link lazy} as `true`.
+         * If the list is set to lazy there could be an empty (Even if {@link mode} is truthy) group at the end of the list, this is because there is no way of checking if the iteration has finisced at that point.
          * If the list is set to lazy you should NEVER calculate the parent iterator before the childrens, like:
          * ```
          * LazyList.from([ 1, 2, 3 ]).split(2, false, true).value; // Stops
          * ```
          * Additionally a lot of unexpected behaviours could occur
          * @param n The length of each slice
-         * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many `undefined` as needed
+         * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many {@link def} as needed
          * @param lazy Indicates if the list should be lazy (and unsafe)
+         * @param def The value to use if the list is too short
          */
-        split(n: number, mode?: JoinMode | boolean, lazy?: boolean): LazySplitList<T>;
+        split(n: number, mode?: JoinMode | boolean, lazy?: boolean, def?: T): LazySplitList<T>;
         /**
          * Returns a {@link LazySet} that contains the elements of the list.
          * The set is lazy, this means that the elements are not calculated until it is checked if they are present.
@@ -401,6 +423,22 @@ declare namespace LazyList {
         [Symbol.iterator](): Generator<number, void, unknown>;
         reverse(): LazyAbstractList<number>;
     }
+    /** Output of {@link buffer} */
+    class LazyBufferList<T> extends LazyAbstractList<T> {
+        f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>;
+        offset: number;
+        start: number;
+        buffer: ReadOnlyIndexable<T>;
+        constructor(f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>, offset?: number);
+        [Symbol.iterator](): Generator<T, void, unknown>;
+        at(n: number, def?: T): T;
+        /**
+         * Tells if the element at the index can be retrieved
+         * @param n The index to check
+         * @param read If false, only the current buffer is checked
+         */
+        tryBuffer(n: number, read?: boolean): any;
+    }
     /** Output of {@link distinct} */
     class LazyDistinctList<TKey, T> extends LazySourceList<T, T> {
         f?: Convert<T, TKey, LazyDistinctList<TKey, T>>;
@@ -525,9 +563,17 @@ declare namespace LazyList {
     class LazyTakeList<T> extends LazySourceList<T, T> {
         p: Predicate<T, LazyTakeList<T>> | number;
         mode: JoinMode | boolean;
-        constructor(source: Iterable<T>, p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean);
-        static take<T>(iter: MarkedIterator<T>, n: number, mode?: JoinMode | boolean): Generator<T, void, unknown>;
+        def: T;
+        constructor(source: Iterable<T>, p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T);
+        static take<T>(iter: MarkedIterator<T>, n: number, mode?: JoinMode | boolean, def?: T): Generator<T, void, unknown>;
         [Symbol.iterator](): Generator<T, void, unknown>;
+    }
+    /** Output of {@link padStart} */
+    class LazyPadStartList<T> extends LazySourceList<T, T> {
+        n: number;
+        def: T;
+        constructor(source: Iterable<T>, n: number, def?: T);
+        [Symbol.iterator](): Generator<T, void, undefined>;
     }
     /** Output of {@link zip} */
     class LazyZipList<A, B, TResult> extends LazySourceList<A, TResult> {
@@ -596,7 +642,8 @@ declare namespace LazyList {
         n: number;
         mode: JoinMode | boolean;
         lazy: boolean;
-        constructor(source: Iterable<T>, n: number, mode?: JoinMode | boolean, lazy?: boolean);
+        def: T;
+        constructor(source: Iterable<T>, n: number, mode?: JoinMode | boolean, lazy?: boolean, def?: T);
         [Symbol.iterator](): Generator<LazyFixedList<T, T>, void, unknown>;
     }
     /** Common functionalities of cached lists */

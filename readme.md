@@ -57,6 +57,7 @@ Methods that generate other `LazyList`s
 - (static & hack) **`attachIterator`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
 - (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
+- (static) **`buffer`**: Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range
 - (static) **`fromIterator`**: Creates a `LazyFixedList` based on a non-iterable iterator
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`distinct`**: Ensures every element of the current list shows up only once
@@ -78,6 +79,7 @@ Methods that generate other `LazyList`s
 **`fixedCount`**: Throws a `RangeError` if the current list has not exactly `n` elements
 - (non lazy?) **`skip`**: Skips the first `n` elements of the list (If `n` is negative, it skips from the end but is not lazy)
 - (non lazy?) **`take`**: Takes only the first `n` elements of the list (If `n` is negative, it takes from the end but is not lazy)
+- (non lazy) **`padStart`**: Force the list to have at least `n` elements by concatenating as many default values (Provided by input) as needed at the beginning of the list
 - **`zip`**: Combines the current list to an iterable based on a provided function
 - **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
 - **`storeBy`**: Lazy version of `groupBy`, the groups cannot be iterated, only their element can
@@ -113,8 +115,30 @@ const a = [ 1, 2, 3 ][Symbol.iterator]().cache().where(x => x < 3).select(x => x
 console.log(a.value); //=> [ 2, 4 ]
 console.log(a.value); //=> [ 2, 4 ]
 ```
-The `attachIterator()` function can additionally be used to make ANYTHING extend from `LazyList`, you just need to pass the class as the argument like so:
+The `LazyList.attachIterator()` function can additionally be used to make ANYTHING extend from `LazyList`, you just need to pass the class as the argument like so:
 ```js
 require("lazylist.js").attachIterator(Array);
 console.log([ 1, 2, 3 ].select(x => x + 1).value); //=> [ 2, 3, 4 ]
+```
+
+## Buffered list
+You can create a buffered list with `LazyList.buffer()`, here is an example of how to loop through each byte of a file, loading 1024 at a time
+```js
+
+/**
+ * Returns a function that returns the first {@link length} bytes of the file pointed by {@link path} starting from the provided index
+ * @param {String} path The path to the file
+ * @param {number} length The length of each chunk
+ */
+function fromFile(path, length = 1024) {
+    const fs = require("fs");
+    const file = fs.openSync(path, "r"); // (Probably should be closed)
+    const buffer = Buffer.alloc(length);
+    return n => buffer.subarray(0, fs.readSync(file, buffer, 0, buffer.length, n));
+}
+
+const file = LazyList.buffer(fromFile(__filename)); // Loops the current file
+for (const elm of file)
+    console.log(elm);
+
 ```

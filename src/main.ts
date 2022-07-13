@@ -13,6 +13,9 @@ function LazyList<T = any>(source?: Iterable<T>): LazyList.LazyAbstractList<T> {
 namespace LazyList {
     export const from = LazyList;
 
+    /** Represents data structure with a numeric indexer and a length that do not need to be writable */
+    export type ReadOnlyIndexable<T> = { readonly [k: number]: T, readonly length: number };
+
     /** A function that indicates the "truthyness" of a value */
     export type Predicate<T, TList = Iterable<T>> = (x: T, i: number, list: TList) => boolean | any;
 
@@ -84,6 +87,16 @@ namespace LazyList {
      */
     export function range(end?: number, start?: number, step?: number, flip?: boolean) {
         return new LazyRangeList(end, start, step, flip);
+    }
+
+    /**
+     * Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range.
+     * Can be freely accessed by index
+     * @param f A function that generates a chunk of data starting from the given index
+     * @param offset If an index is out of range, the loaded chunk will start this amount of elements before the index
+     */
+    export function buffer<T>(f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>, offset?: number) {
+        return new LazyBufferList(f, offset);
     }
 
     /** An iterable wrapper with helper functions */
@@ -261,10 +274,21 @@ namespace LazyList {
         /**
          * Takes the first {@link p} elements of the list and skips the rest
          * @param p The elements to take (Use a negative number to take from the end); If a function is given, it will be called for each element and the elements will be taken until the function returns `false`
-         * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many `undefined` as needed
+         * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many {@link def} as needed
+         * @param def The value to use if the list is too short
          */
-        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean) {
-            return new LazyTakeList<T>(this, p, mode);
+        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T) {
+            return new LazyTakeList<T>(this, p, mode, def);
+        }
+
+        /**
+         * Force the list to have at least {@link n} elements by concatenating as many {@link def} as needed at the beginning of the list.
+         * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument)
+         * @param n The number of desired elements
+         * @param def The value to use if the list is too short
+         */
+        padStart(n: number, def?: T) {
+            return new LazyPadStartList(this, n, def);
         }
 
         /**
@@ -320,17 +344,19 @@ namespace LazyList {
         /**
          * Groups the list's elements, {@link n} at a time.
          * Non lazy by default (It calculates {@link n} elements at a time), but can be made lazy by setting {@link lazy} as `true`.
+         * If the list is set to lazy there could be an empty (Even if {@link mode} is truthy) group at the end of the list, this is because there is no way of checking if the iteration has finisced at that point.
          * If the list is set to lazy you should NEVER calculate the parent iterator before the childrens, like:
          * ```
          * LazyList.from([ 1, 2, 3 ]).split(2, false, true).value; // Stops
          * ```
          * Additionally a lot of unexpected behaviours could occur
          * @param n The length of each slice
-         * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many `undefined` as needed
+         * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many {@link def} as needed
          * @param lazy Indicates if the list should be lazy (and unsafe)
+         * @param def The value to use if the list is too short
          */
-        split(n: number, mode?: JoinMode | boolean, lazy?: boolean) {
-            return new LazySplitList(this, n, mode, lazy);
+        split(n: number, mode?: JoinMode | boolean, lazy?: boolean, def?: T) {
+            return new LazySplitList(this, n, mode, lazy, def);
         }
 
         /**
@@ -638,7 +664,7 @@ namespace LazyList {
             return this.source == null
                     ? []
                 : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
-                    ? this.source as any
+                    ? this.source
                     : Array.from(this.source) as any;
         }
     }
@@ -674,6 +700,39 @@ namespace LazyList {
 
         reverse(): LazyAbstractList<number> {
             return new LazyRangeList(this.end, this.start, this.step, true);
+        }
+    }
+
+    /** Output of {@link buffer} */
+    export class LazyBufferList<T> extends LazyAbstractList<T> {
+        start: number = 0;
+        buffer: ReadOnlyIndexable<T> = [];
+        constructor(public f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>, public offset: number = 0) { super(); }
+
+        *[Symbol.iterator]() {
+            for (var i = 0; this.tryBuffer(i); i++)
+                yield this.buffer[i - this.start];
+        }
+
+        at(n: number, def?: T): T {
+            return this.tryBuffer(n)
+                ? this.buffer[n - this.start]
+                : def;
+        }
+
+        /**
+         * Tells if the element at the index can be retrieved
+         * @param n The index to check
+         * @param read If false, only the current buffer is checked
+         */
+        tryBuffer(n: number, read: boolean = true) {
+            const real = n - this.start;
+            if (0 <= real && real < this.buffer.length) return true;
+            if (!read) return false;
+
+            this.start = Math.max(0, n - this.offset);
+            this.buffer = this.f(this.start, this);
+            return this.tryBuffer(n, false);
         }
     }
 
@@ -955,12 +1014,15 @@ namespace LazyList {
 
     /** Output of {@link LazyAbstractList.take} */
     export class LazyTakeList<T> extends LazySourceList<T, T> {
-        constructor (source: Iterable<T>, public p: Predicate<T, LazyTakeList<T>> | number, public mode: JoinMode | boolean = false) { super(source); }
+        constructor (source: Iterable<T>, public p: Predicate<T, LazyTakeList<T>> | number, public mode: JoinMode | boolean = false, public def: T = undefined) { super(source); }
 
-        static *take<T>(iter: MarkedIterator<T>, n: number, mode: JoinMode | boolean = false) {
+        static *take<T>(iter: MarkedIterator<T>, n: number, mode: JoinMode | boolean = false, def: T = undefined) {
             for (var value: T, i = 0; i < n; i++) // If this were a foreach loop the first element after "n" would have been calculated too
-                if ((iter.done = ({ value } = iter.next()).done) && !mode)
-                    break;
+                if (iter.done = ({ value } = iter.next()).done)
+                    if (!mode)
+                        break;
+                    else
+                        yield def;
                 else
                     yield value;
         }
@@ -973,7 +1035,7 @@ namespace LazyList {
                     const temp = this.base();
                     yield* LazySkipList.skip(temp[Symbol.iterator](), temp.length + this.p);
                 }
-                else yield* LazyTakeList.take(this.source[Symbol.iterator](), this.p, this.mode);
+                else yield* LazyTakeList.take(this.source[Symbol.iterator](), this.p, this.mode, this.def);
                 return;
             }
 
@@ -983,6 +1045,18 @@ namespace LazyList {
                     yield elm;
                 else
                     break;
+        }
+    }
+
+    /** Output of {@link padStart} */
+    export class LazyPadStartList<T> extends LazySourceList<T, T> {
+        constructor (source: Iterable<T>, public n: number, public def: T = undefined) { super(source); }
+
+        *[Symbol.iterator]() {
+            const temp = this.base();
+            for (var i = temp.length; i < this.n; i++)
+                yield this.def;
+            yield* temp;
         }
     }
 
@@ -1146,16 +1220,20 @@ namespace LazyList {
 
     /** Output of {@link split} */
     export class LazySplitList<T> extends LazySourceList<T, LazyAbstractList<T>> {
-        constructor(source: Iterable<T>, public n: number, public mode: JoinMode | boolean = false, public lazy: boolean = false) { super(source); }
+        constructor(source: Iterable<T>, public n: number, public mode: JoinMode | boolean = false, public lazy: boolean = false, public def: T = undefined) { super(source); }
 
         *[Symbol.iterator]() {
             const iter: MarkedIterator<T> = this.source[Symbol.iterator]();
             while (!iter.done)
             {
-                const temp = new LazyFixedList(LazyTakeList.take(iter, this.n, this.mode));  // This doesn't use the normal `list.take()` because I would have reconverted "iter" into an iterable
-                yield this.lazy
-                    ? temp
-                    : temp.calc();
+                const lazy = new LazyFixedList(LazyTakeList.take(iter, this.n, this.mode, this.def));  // This doesn't use the normal `list.take()` because I would have reconverted "iter" into an iterable
+                if (!this.lazy)
+                {
+                    const temp = lazy.calc();
+                    if (temp.has()) // If the list is not lazy, it can be checked for emptyness
+                        yield temp;
+                }
+                else yield lazy;
             }
         }
     }
