@@ -591,12 +591,24 @@ function LazyList(source) {
             if (this.source != null)
                 yield* this.source;
         }
+        /** Obtains the calculated version of {@link source} */
         base() {
             return this.source == null
                 ? []
                 : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
                     ? this.source
                     : Array.from(this.source);
+        }
+        /**
+         * Returns an iterable containing the elements of {@link source} and its length.
+         * If computing the length is expensive, it will calculate {@link source}, so its returned to prevent computing it twice
+         */
+        calcLength() {
+            const l = fastCount(this.source);
+            if (~l)
+                return [this.source, l];
+            const temp = this.base();
+            return [temp, temp.length];
         }
     }
     LazyList.LazySourceList = LazySourceList;
@@ -958,8 +970,8 @@ function LazyList(source) {
         *[Symbol.iterator]() {
             if (typeof this.p === "number") {
                 if (this.p < 0) {
-                    const temp = this.base();
-                    yield* LazyTakeList.take(temp[Symbol.iterator](), temp.length + this.p);
+                    const [iter, l] = this.calcLength();
+                    yield* LazyTakeList.take(iter[Symbol.iterator](), l + this.p);
                 }
                 else
                     yield* LazySkipList.skip(this.source[Symbol.iterator](), this.p);
@@ -993,8 +1005,8 @@ function LazyList(source) {
         *[Symbol.iterator]() {
             if (typeof this.p === "number") {
                 if (this.p < 0) {
-                    const temp = this.base();
-                    yield* LazySkipList.skip(temp[Symbol.iterator](), temp.length + this.p);
+                    const [iter, l] = this.calcLength();
+                    yield* LazySkipList.skip(iter[Symbol.iterator](), l + this.p);
                 }
                 else
                     yield* LazyTakeList.take(this.source[Symbol.iterator](), this.p, this.mode, this.def);
@@ -1017,10 +1029,10 @@ function LazyList(source) {
             this.def = def;
         }
         *[Symbol.iterator]() {
-            const temp = this.base();
-            for (var i = temp.length; i < this.n; i++)
+            const [iter, l] = this.calcLength();
+            for (var i = l; i < this.n; i++)
                 yield this.def;
-            yield* temp;
+            yield* iter;
         }
     }
     LazyList.LazyPadStartList = LazyPadStartList;

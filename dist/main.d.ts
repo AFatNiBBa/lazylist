@@ -404,7 +404,13 @@ declare namespace LazyList {
         source?: Iterable<I>;
         constructor(source?: Iterable<I>);
         [Symbol.iterator](): Generator<any, void, any>;
+        /** Obtains the calculated version of {@link source} */
         base(): I[];
+        /**
+         * Returns an iterable containing the elements of {@link source} and its length.
+         * If computing the length is expensive, it will calculate {@link source}, so its returned to prevent computing it twice
+         */
+        calcLength(): [Iterable<I>, number];
     }
     /**
      * Output of {@link LazyList}.
