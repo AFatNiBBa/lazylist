@@ -70,6 +70,17 @@ function LazyList(source) {
     }
     LazyList.fromIterator = fromIterator;
     /**
+     * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
+     * Since the sequence is infinite, it will create problems with non lazy methods.
+     * Since the sequence is random, it will not be the same every time you calculate it
+     * @param top The highest number in the sequence
+     * @param bottom The lowest number in the sequence
+     */
+    function rand(top, bottom) {
+        return new LazyRandList(top, bottom);
+    }
+    LazyList.rand = rand;
+    /**
      * Returns an auto-generated list of numbers
      * @param end The end of the sequence
      * @param start The begin of the sequence
@@ -622,6 +633,23 @@ function LazyList(source) {
         }
     }
     LazyList.LazyFixedList = LazyFixedList;
+    /** Output of {@link rand} */
+    class LazyRandList extends LazyAbstractList {
+        constructor(top, bottom) {
+            super();
+            this.top = top;
+            this.bottom = bottom;
+        }
+        *[Symbol.iterator]() {
+            while (true)
+                yield this.top != null
+                    ? this.bottom != null
+                        ? Math.floor(Math.random() * (this.top - this.bottom + 1)) + this.bottom
+                        : Math.floor(Math.random() * (this.top + 1))
+                    : Math.random();
+        }
+    }
+    LazyList.LazyRandList = LazyRandList;
     /** Output of {@link range} */
     class LazyRangeList extends LazyAbstractList {
         constructor(end = Infinity, start = 0, step = 1, flip) {

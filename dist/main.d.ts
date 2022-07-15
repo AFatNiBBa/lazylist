@@ -52,6 +52,14 @@ declare namespace LazyList {
      */
     function fromIterator<T>(iter: Iterator<T>): LazyFixedList<T>;
     /**
+     * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
+     * Since the sequence is infinite, it will create problems with non lazy methods.
+     * Since the sequence is random, it will not be the same every time you calculate it
+     * @param top The highest number in the sequence
+     * @param bottom The lowest number in the sequence
+     */
+    function rand(top?: number, bottom?: number): LazyRandList;
+    /**
      * Returns an auto-generated list of numbers
      * @param end The end of the sequence
      * @param start The begin of the sequence
@@ -418,6 +426,13 @@ declare namespace LazyList {
      */
     class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
         get fastCount(): number;
+    }
+    /** Output of {@link rand} */
+    class LazyRandList extends LazyAbstractList<number> {
+        top?: number;
+        bottom?: number;
+        constructor(top?: number, bottom?: number);
+        [Symbol.iterator](): Generator<number, void, unknown>;
     }
     /** Output of {@link range} */
     class LazyRangeList extends LazyAbstractList<number> {
