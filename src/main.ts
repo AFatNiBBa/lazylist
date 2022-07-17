@@ -79,8 +79,8 @@ namespace LazyList {
      * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
      * Since the sequence is infinite, it will create problems with non lazy methods.
      * Since the sequence is random, it will not be the same every time you calculate it
-     * @param top The highest number in the sequence
-     * @param bottom The lowest number in the sequence
+     * @param top The highest number in the sequence; If not provided, it will be `1` and the random numbers will not be integers
+     * @param bottom The lowest number in the sequence; If not provided, it will be `0`
      */
     export function rand(top?: number, bottom?: number) {
         return new LazyRandList(top, bottom);
@@ -687,93 +687,6 @@ namespace LazyList {
         }
     }
 
-    /**
-     * Instances of this class are guaranteed to have a base iterable.
-     * The input iterable's elements are of type {@link I} and the output's ones are of type {@link O}
-     */
-    export abstract class LazySourceList<I, O> extends LazyAbstractList<O> {
-        constructor(public source?: Iterable<I>) { super(); }
-
-        *[Symbol.iterator]() {
-            if (this.source != null)
-                yield* <any>this.source;
-        }
-
-        /** Obtains the calculated version of {@link source} */
-        base(): I[] {
-            return this.source == null
-                    ? []
-                : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
-                    ? this.source
-                    : Array.from(this.source) as any;
-        }
-
-        /**
-         * Returns an iterable containing the elements of {@link source} and its length.
-         * If computing the length is expensive, it will calculate {@link source}, so its returned to prevent computing it twice
-         */
-        calcLength(): [ Iterable<I>, number ] {
-            const l = fastCount(this.source);
-            if (~l) return [ this.source, l ];
-            
-            const temp = this.base();
-            return [ temp, temp.length ];
-        }
-    }
-
-    /**
-     * Output of {@link LazyList}.
-     * Represents a list with the same number of elements as {@link source}.
-     * It is used even by lists that need the {@link LazyFixedList.fastCount} of the {@link source} to calculate theirs
-     */
-    export class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
-        get fastCount() {
-            return fastCount(this.source);
-        }
-    }
-
-    /** Output of {@link rand} */
-    export class LazyRandList extends LazyAbstractList<number> {
-        constructor(public top?: number, public bottom?: number) { super(); }
-
-        *[Symbol.iterator]() {
-            while (true)
-                yield this.top != null
-                    ? this.bottom != null
-                        ? Math.floor(Math.random() * (this.top - this.bottom + 1)) + this.bottom
-                        : Math.floor(Math.random() * (this.top + 1))
-                    : Math.random();
-        }
-
-        get fastCount() {
-            return Infinity;
-        }
-    }
-
-    /** Output of {@link range} */
-    export class LazyRangeList extends LazyAbstractList<number> {
-        constructor(public end: number = Infinity, public start: number = 0, public step: number = 1, public flip?: boolean) {
-            super();
-
-            // If `flip` is not specified it will default to `true` if `end` is less than 0; In that case `end` will be flipped
-            if (arguments.length < 4 && (this.flip = this.end < 0))
-                this.end *= -1;
-        }
-
-        *[Symbol.iterator]() {
-            if (this.flip)
-                for (let i = this.end - 1; i >= this.start; i -= this.step)
-                    yield i;
-            else
-                for (let i = this.start; i < this.end; i += this.step)
-                    yield i;
-        }
-
-        reverse(): LazyAbstractList<number> {
-            return new LazyRangeList(this.end, this.start, this.step, true);
-        }
-    }
-
     /** Iterable that stores only a cached chunk of data at a time */
     export class LazyBufferList<T> extends LazyAbstractList<T> {
         start: number = 0;
@@ -830,7 +743,10 @@ namespace LazyList {
          * @param target The iterator to clone into; If not provided, a new iterator will be created
          */
         clone(target?: BufferIterator<T>) {
-            return Object.assign(target ?? new BufferIterator(null), this);
+            const out = Object.assign(target ?? new BufferIterator<T>(null), this);     // `current` and `currentIndex` are not automatically cloned because they are accessors
+            out.#currentIndex = this.#currentIndex;                                     // The private fields are setted to avoid useless recalculations
+            out.#current = this.#current;
+            return out;
         }
     
         /**
@@ -868,15 +784,7 @@ namespace LazyList {
          * @param n The number of steps to move; If not provided, the iterator will move by `1`
          */
         peek(n: number = 1) {
-            const { buffer, currentIndex, current } = this;
-            try { return this.next(n); }
-            finally
-            {
-                // Restores the previous state of the iterator to prevent useless recalculations
-                this.buffer = buffer;
-                this.#currentIndex = currentIndex;
-                this.#current = current;
-            }
+            return this.clone().next(n);
         }
     
         /** Obtains the index of the current element of the iterator */
@@ -888,6 +796,93 @@ namespace LazyList {
         get current(): T { return this.#current; }
         set current(value: T) { this.#currentIndex = this.indexOf(this.#current = value); }
         #current: T;    
+    }
+
+    /** Output of {@link rand} */
+    export class LazyRandList extends LazyAbstractList<number> {
+        constructor(public top?: number, public bottom?: number) { super(); }
+
+        *[Symbol.iterator]() {
+            while (true)
+                yield this.top != null
+                    ? this.bottom != null
+                        ? Math.floor(Math.random() * (this.top - this.bottom + 1)) + this.bottom
+                        : Math.floor(Math.random() * (this.top + 1))
+                    : Math.random();
+        }
+
+        get fastCount() {
+            return Infinity;
+        }
+    }
+
+    /** Output of {@link range} */
+    export class LazyRangeList extends LazyAbstractList<number> {
+        constructor(public end: number = Infinity, public start: number = 0, public step: number = 1, public flip?: boolean) {
+            super();
+
+            // If `flip` is not specified it will default to `true` if `end` is less than 0; In that case `end` will be flipped
+            if (arguments.length < 4 && (this.flip = this.end < 0))
+                this.end *= -1;
+        }
+
+        *[Symbol.iterator]() {
+            if (this.flip)
+                for (let i = this.end - 1; i >= this.start; i -= this.step)
+                    yield i;
+            else
+                for (let i = this.start; i < this.end; i += this.step)
+                    yield i;
+        }
+
+        reverse(): LazyAbstractList<number> {
+            return new LazyRangeList(this.end, this.start, this.step, true);
+        }
+    }
+
+    /**
+     * Instances of this class are guaranteed to have a base iterable.
+     * The input iterable's elements are of type {@link I} and the output's ones are of type {@link O}
+     */
+    export abstract class LazySourceList<I, O> extends LazyAbstractList<O> {
+        constructor(public source?: Iterable<I>) { super(); }
+
+        *[Symbol.iterator]() {
+            if (this.source != null)
+                yield* <any>this.source;
+        }
+
+        /** Obtains the calculated version of {@link source} */
+        base(): I[] {
+            return this.source == null
+                    ? []
+                : typeof this.source === "string" || this.source instanceof String || this.source instanceof Array
+                    ? this.source
+                    : Array.from(this.source) as any;
+        }
+
+        /**
+         * Returns an iterable containing the elements of {@link source} and its length.
+         * If computing the length is expensive, it will calculate {@link source}, so its returned to prevent computing it twice
+         */
+        calcLength(): [ Iterable<I>, number ] {
+            const l = fastCount(this.source);
+            if (~l) return [ this.source, l ];
+            
+            const temp = this.base();
+            return [ temp, temp.length ];
+        }
+    }
+
+    /**
+     * Output of {@link LazyList}.
+     * Represents a list with the same number of elements as {@link source}.
+     * It is used even by lists that need the {@link LazyFixedList.fastCount} of the {@link source} to calculate theirs
+     */
+    export class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
+        get fastCount() {
+            return fastCount(this.source);
+        }
     }
 
     /** Output of {@link distinct} */

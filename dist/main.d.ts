@@ -52,8 +52,8 @@ declare namespace LazyList {
      * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
      * Since the sequence is infinite, it will create problems with non lazy methods.
      * Since the sequence is random, it will not be the same every time you calculate it
-     * @param top The highest number in the sequence
-     * @param bottom The lowest number in the sequence
+     * @param top The highest number in the sequence; If not provided, it will be `1` and the random numbers will not be integers
+     * @param bottom The lowest number in the sequence; If not provided, it will be `0`
      */
     function rand(top?: number, bottom?: number): LazyRandList;
     /**
@@ -418,48 +418,6 @@ declare namespace LazyList {
         /** Returns the length of the iterable if it is easy to compute, otherwise it returns `-1` */
         get fastCount(): number;
     }
-    /**
-     * Instances of this class are guaranteed to have a base iterable.
-     * The input iterable's elements are of type {@link I} and the output's ones are of type {@link O}
-     */
-    abstract class LazySourceList<I, O> extends LazyAbstractList<O> {
-        source?: Iterable<I>;
-        constructor(source?: Iterable<I>);
-        [Symbol.iterator](): Generator<any, void, any>;
-        /** Obtains the calculated version of {@link source} */
-        base(): I[];
-        /**
-         * Returns an iterable containing the elements of {@link source} and its length.
-         * If computing the length is expensive, it will calculate {@link source}, so its returned to prevent computing it twice
-         */
-        calcLength(): [Iterable<I>, number];
-    }
-    /**
-     * Output of {@link LazyList}.
-     * Represents a list with the same number of elements as {@link source}.
-     * It is used even by lists that need the {@link LazyFixedList.fastCount} of the {@link source} to calculate theirs
-     */
-    class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
-        get fastCount(): number;
-    }
-    /** Output of {@link rand} */
-    class LazyRandList extends LazyAbstractList<number> {
-        top?: number;
-        bottom?: number;
-        constructor(top?: number, bottom?: number);
-        [Symbol.iterator](): Generator<number, void, unknown>;
-        get fastCount(): number;
-    }
-    /** Output of {@link range} */
-    class LazyRangeList extends LazyAbstractList<number> {
-        end: number;
-        start: number;
-        step: number;
-        flip?: boolean;
-        constructor(end?: number, start?: number, step?: number, flip?: boolean);
-        [Symbol.iterator](): Generator<number, void, unknown>;
-        reverse(): LazyAbstractList<number>;
-    }
     /** Iterable that stores only a cached chunk of data at a time */
     class LazyBufferList<T> extends LazyAbstractList<T> {
         f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>;
@@ -490,7 +448,7 @@ declare namespace LazyList {
          * Clones the current iterator into another
          * @param target The iterator to clone into; If not provided, a new iterator will be created
          */
-        clone(target?: BufferIterator<T>): any;
+        clone(target?: BufferIterator<T>): BufferIterator<T> & this;
         /**
          * Reaches the {@link currentIndex} of {@link target}
          * @param target The iterator to reach
@@ -521,6 +479,48 @@ declare namespace LazyList {
         /** Obtains the current element of the iterator */
         get current(): T;
         set current(value: T);
+    }
+    /** Output of {@link rand} */
+    class LazyRandList extends LazyAbstractList<number> {
+        top?: number;
+        bottom?: number;
+        constructor(top?: number, bottom?: number);
+        [Symbol.iterator](): Generator<number, void, unknown>;
+        get fastCount(): number;
+    }
+    /** Output of {@link range} */
+    class LazyRangeList extends LazyAbstractList<number> {
+        end: number;
+        start: number;
+        step: number;
+        flip?: boolean;
+        constructor(end?: number, start?: number, step?: number, flip?: boolean);
+        [Symbol.iterator](): Generator<number, void, unknown>;
+        reverse(): LazyAbstractList<number>;
+    }
+    /**
+     * Instances of this class are guaranteed to have a base iterable.
+     * The input iterable's elements are of type {@link I} and the output's ones are of type {@link O}
+     */
+    abstract class LazySourceList<I, O> extends LazyAbstractList<O> {
+        source?: Iterable<I>;
+        constructor(source?: Iterable<I>);
+        [Symbol.iterator](): Generator<any, void, any>;
+        /** Obtains the calculated version of {@link source} */
+        base(): I[];
+        /**
+         * Returns an iterable containing the elements of {@link source} and its length.
+         * If computing the length is expensive, it will calculate {@link source}, so its returned to prevent computing it twice
+         */
+        calcLength(): [Iterable<I>, number];
+    }
+    /**
+     * Output of {@link LazyList}.
+     * Represents a list with the same number of elements as {@link source}.
+     * It is used even by lists that need the {@link LazyFixedList.fastCount} of the {@link source} to calculate theirs
+     */
+    class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
+        get fastCount(): number;
     }
     /** Output of {@link distinct} */
     class LazyDistinctList<T, TKey = T> extends LazySourceList<T, T> {

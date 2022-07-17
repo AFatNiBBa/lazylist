@@ -61,6 +61,7 @@ Classes without methods:
 Methods that generate other `LazyList`s:
 - (static & hack) **`injectInto`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
 - (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
+- (static) **`rand`**: Returns an INFINITE sequence of random numbers comprised between the provided boundaries
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`distinct`**: Ensures every element of the current list shows up only once
