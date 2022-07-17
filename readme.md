@@ -106,7 +106,7 @@ Methods that generate other `LazyList`s:
 - **`slice`**: Returns a section of the current list
 
 ## Generators as lazy lists
-Executing this method, will make every generator have the `LazyList`'s methods
+Executing this function, will make every generator have the `LazyList`'s methods
 ```js
 require("lazylist.js").injectInto();
 const a = [ 1, 2, 3 ][Symbol.iterator]().where(x => x < 3).select(x => x * 2);
