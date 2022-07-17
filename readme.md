@@ -33,6 +33,7 @@ Call the `cache()` method on the list to fix this issue.
 Each `LazyList` allows you to execute these methods. <br>
 For the details look at the JSDocs.
 
+### **Aggregate**
 - **`at`**: Returns the element at the provided index
 - **`last`**: Gets the last element of the list or the provided value as default if it's empty
 - **`first`**: Gets the first element of the list or the provided value as default if it's empty
@@ -40,6 +41,7 @@ For the details look at the JSDocs.
 - **`aggregate`**: Aggregates the current list based on a provided function
 - **`all`**: Returns `true` if the provided predicate returns `true` for every element of the list
 - **`any`**: Returns `true` if the provided predicate returns `true` for at least one element of the list
+- **`inBound`**: Returns `true` if the element at the given index can be retrieved
 - **`has`**: Returns `true` if a value is in the list; If nothing is provided returns `true` if the list has at list one element
 - **`indexOf`**: Returns the index of the provided value in the list if found, `-1` otherwise
 - **`find`**: Returns the index of the first element of the current list for which the provided function returns `true` end the element itself; If nothing is found returns `[ -1, null ]`
@@ -53,12 +55,13 @@ For the details look at the JSDocs.
 - (getter) **`fastCount`**: Returns the length of the current list if it is easy to compute, `-1` otherwise
 
 ### **Lists**
-Methods that generate other `LazyList`s
-- (static & hack) **`attachIterator`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
+Classes without methods:
+- **`LazyBufferList`**: Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range
+- **`BufferIterator`**: Similiar to `LazyBufferList`, but allows the storage of the current position
+Methods that generate other `LazyList`s:
+- (static & hack) **`injectInto`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
 - (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
-- (static) **`buffer`**: Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range
-- (static) **`fromIterator`**: Creates a `LazyFixedList` based on a non-iterable iterator
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
 - **`distinct`**: Ensures every element of the current list shows up only once
 - **`except`**: Ensures no element of the given iterable shows up in the current list
@@ -74,17 +77,21 @@ Methods that generate other `LazyList`s
 - **`defaultIfEmpty`**: Adds a value to the end of the current list if it is empty
 - **`repeat`**: Repeat the list's elements `n` times
 - (non lazy) **`reverse`**: Reverses the list
+- (non lazy) **`shuffle`**: Shuffles the list in a randomic way
 - (non lazy) **`sort`**: Sorts the list based on a provided function
 - **`splice`**: Replaces a section of the list with a new one based on a provided function
 **`fixedCount`**: Throws a `RangeError` if the current list has not exactly `n` elements
 - (non lazy?) **`skip`**: Skips the first `n` elements of the list (If `n` is negative, it skips from the end but is not lazy)
 - (non lazy?) **`take`**: Takes only the first `n` elements of the list (If `n` is negative, it takes from the end but is not lazy)
 - (non lazy) **`padStart`**: Force the list to have at least `n` elements by concatenating as many default values (Provided by input) as needed at the beginning of the list
+- **`accumulate`**: Aggregates the list based on a provided function but yields the intermediate results too
 - **`zip`**: Combines the current list to an iterable based on a provided function
 - **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
+- **`combinations`**: Generates all the possible combinations of the provided length of the elements of the list
 - **`storeBy`**: Lazy version of `groupBy`, the groups cannot be iterated, only their element can
 - (non lazy) **`groupBy`**: Groups the list's elements based on a provided function
 - (non lazy | unsafe) **`split`**: Groups the list's elements, `n` at a time; Passing `true` as the `lazy` argument will make the list lazy but unsafe
+- **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
 - **`toSet`**: Returns a set that contains the elements of the current list
 - **`toMap`**: Returns a map that contains the elements of the current list
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
@@ -92,7 +99,6 @@ Methods that generate other `LazyList`s
 - (non lazy) **`await`**: Calculates and awaits each element of the list and wraps them in another `LazyList`
 - **`then`**: Applies a "then" function to each element of the current list (whose elements should be promises)
 - **`catch`**: Applies a "catch" function to each element of the current list (whose elements should be promises)
-- **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
 - **`ofType`**: Filters the list returning only the elements which are instances of the given constructor
 - **`assign`**: Executes `Object.assign()` on each element passing the given object as the second parameter
 - **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)
@@ -102,7 +108,7 @@ Methods that generate other `LazyList`s
 ## Generators as lazy lists
 Executing this method, will make every generator have the `LazyList`'s methods
 ```js
-require("lazylist.js").attachIterator();
+require("lazylist.js").injectInto();
 const a = [ 1, 2, 3 ][Symbol.iterator]().where(x => x < 3).select(x => x * 2);
 console.log(a.value); //=> [ 2, 4 ]
 console.log(a.value); //=> []
@@ -110,19 +116,32 @@ console.log(a.value); //=> []
 Remember that generators can be iterated only one time (That's the reason why `a.value` returned an empty list the second time). <br>
 To fix this problem, just call the `cache()` method on the generator like so:
 ```js
-require("lazylist.js").attachIterator();
+require("lazylist.js").injectInto();
 const a = [ 1, 2, 3 ][Symbol.iterator]().cache().where(x => x < 3).select(x => x * 2);
 console.log(a.value); //=> [ 2, 4 ]
 console.log(a.value); //=> [ 2, 4 ]
 ```
-The `LazyList.attachIterator()` function can additionally be used to make ANYTHING extend from `LazyList`, you just need to pass the class as the argument like so:
+The `injectInto()` function can additionally be used to make ANYTHING extend from `LazyList`, you just need to pass the class as the argument like so:
 ```js
-require("lazylist.js").attachIterator(Array);
+require("lazylist.js").injectInto(Array);
 console.log([ 1, 2, 3 ].select(x => x + 1).value); //=> [ 2, 3, 4 ]
+```
+But be careful, the standard array methods will still have an highter precedence
+```js
+const {
+    join,   // <Array>.join
+    select  // <LazyAbstractList>.select
+} = [ 1, 2, 3 ];
+```
+Additionally you can't solve that with the `from()` function, because now `Array` is already a `LazyList`, so it will not be wrapped it in one.
+To solve that, you just need to pass `true` as the second argumet of `from()` to force the wrap
+```js
+console.log(LazyList.from([ 1, 2, 3 ]))       //=> [ 1, 2, 3 ]
+console.log(LazyList.from([ 1, 2, 3 ], true)) //=> LazyFixedList { source: [ 1, 2, 3 ] }
 ```
 
 ## Buffered list
-You can create a buffered list with `LazyList.buffer()`, here is an example of how to loop through each byte of a file, loading 1024 at a time
+You can create a buffered list with the `LazyList.buffer()` method, here is an example of how to loop through each byte of a file, loading 1024 at a time
 ```js
 
 /**

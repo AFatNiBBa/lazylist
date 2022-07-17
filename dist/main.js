@@ -10,17 +10,21 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
     return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
 };
 /**
- * Returns a {@link LazyList.LazyAbstractList} based on an iterable.
+ * Returns a {@link LazyList.LazyAbstractList} based on an iterable or an non-iterable iterator.
+ * If the {@link source} is a non-iterable iterator, it gets wrapped in a new object that returns {@link source} in its {@link Symbol.iterator} method.
  * If {@link source} is already a {@link LazyList.LazyAbstractList}, it gets returned directly, otherwise it gets wrapped in a {@link LazyList.LazyFixedList}
- * @param source The iterable
+ * @param source The iterable/iterator
+ * @param force If `true`, {@link source} is always wrapped
  */
-function LazyList(source) {
-    return source instanceof LazyList.LazyAbstractList
+function LazyList(source, force = false) {
+    return !force && source instanceof LazyList.LazyAbstractList
         ? source
-        : new LazyList.LazyFixedList(source);
+        : new LazyList.LazyFixedList(typeof source[Symbol.iterator] === 'function' // If the source is iterable
+            ? source // Wrap it directly
+            : { [Symbol.iterator]: () => source }); // Otherwise try to use it as an iterator
 }
 (function (LazyList) {
-    var _LazyStore_iter, _LazyAbstractCacheList_iter;
+    var _BufferIterator_currentIndex, _BufferIterator_current, _LazyStore_iter, _LazyAbstractCacheList_iter;
     LazyList.from = LazyList;
     /** Indicates how two iterable should be conbined it they have different sizes */
     let JoinMode;
@@ -39,12 +43,12 @@ function LazyList(source) {
      * @param ctor The constructor to which you want to change the base class; If not provided, it will apply the functionalities to {@link Generator}
      * @returns The library itself
      */
-    function attachIterator(ctor) {
+    function injectInto(ctor) {
         //@ts-ignore
         (ctor?.prototype ?? (function* () { })().__proto__.__proto__.__proto__).__proto__ = LazyAbstractList.prototype;
         return LazyList;
     }
-    LazyList.attachIterator = attachIterator;
+    LazyList.injectInto = injectInto;
     /**
      * Returns the length of the iterable if it is easy to compute, otherwise it returns `-1`
      * @param source The iterable from which to get the count
@@ -61,14 +65,6 @@ function LazyList(source) {
                         : -1;
     }
     LazyList.fastCount = fastCount;
-    /**
-     * Creates a {@link LazyFixedList} based on a non-iterable iterator
-     * @param iter The iterator
-     */
-    function fromIterator(iter) {
-        return new LazyFixedList({ [Symbol.iterator]: () => iter });
-    }
-    LazyList.fromIterator = fromIterator;
     /**
      * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
      * Since the sequence is infinite, it will create problems with non lazy methods.
@@ -91,16 +87,6 @@ function LazyList(source) {
         return new LazyRangeList(end, start, step, flip);
     }
     LazyList.range = range;
-    /**
-     * Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range.
-     * Can be freely accessed by index
-     * @param f A function that generates a chunk of data starting from the given index
-     * @param offset If an index is out of range, the loaded chunk will start this amount of elements before the index
-     */
-    function buffer(f, offset) {
-        return new LazyBufferList(f, offset);
-    }
-    LazyList.buffer = buffer;
     /** An iterable wrapper with helper functions */
     class LazyAbstractList {
         /**
@@ -220,6 +206,13 @@ function LazyList(source) {
             return new LazyReverseList(this);
         }
         /**
+         * Shuffles the list in a randomic way.
+         * Non lazy
+         */
+        shuffle() {
+            return new LazyShuffleList(this);
+        }
+        /**
          * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} since it would be wrong).
          * Non lazy
          * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
@@ -264,7 +257,8 @@ function LazyList(source) {
         }
         /**
          * Force the list to have at least {@link n} elements by concatenating as many {@link def} as needed at the beginning of the list.
-         * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument)
+         * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument).
+         * Non lazy
          * @param n The number of desired elements
          * @param def The value to use if the list is too short
          */
@@ -272,9 +266,18 @@ function LazyList(source) {
             return new LazyPadStartList(this, n, def);
         }
         /**
+         * Aggregates the list based on {@link f}.
+         * Similiar to {@link aggregate} but yields the intermediate results
+         * @param f A combination function
+         * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration)
+         */
+        accumulate(f, out) {
+            return new LazyAccumulateList(this, f, out, arguments.length > 1);
+        }
+        /**
          * Combines the current list with {@link other} based on {@link f}
          * @param other An iterable
-         * @param f A combination function
+         * @param f A combination function, if not provided the pairs will be put in a tuple
          * @param mode Different length handling
          */
         zip(other, f, mode) {
@@ -285,15 +288,22 @@ function LazyList(source) {
          * If no {@link p} argument is supplied, the method does the cartesian product of the two lists (And {@link mode} becomes useless).
          * If {@link mode} is not {@link JoinMode.inner}, `undefined` will be supplied as the missing element.
          * The index available in the functions is the one of the "left" part in the {@link JoinMode.inner} operation, and `-1` in the {@link JoinMode.outer} part.
-         * The {@link JoinMode.right} part ({@link other}) will be calculeted one time for each element of the {@link JoinMode.left} part and must be of the same size each time.
-         * Wrap {@link other} in a {@link LazyCacheList} (Or use the {@link cache} method) to cache the elements
          * @param other An iterable
          * @param p A filter function
-         * @param f A combination function
+         * @param f A combination function, if not provided pairs will be put in a tuple
          * @param mode Different length handling
          */
         join(other, p, f, mode) {
             return new LazyJoinList(this, other, p, f, mode);
+        }
+        /**
+         * Generates all the possible combinations of length {@link depth} of the elements of the list.
+         * Only one combination will be generated for each pair of elements from the two lists (If there is "(a, b)" there will not be "(b, a)").
+         * The index available in the functions is the one of the first element of the group
+         * @param depth The length of the each combination
+         */
+        combinations(depth) {
+            return new LazyCombinationsList(this, depth);
         }
         /**
          * Groups the list's elements based on a provided function.
@@ -303,7 +313,8 @@ function LazyList(source) {
          * const store = LazyList.from([ 1, 2, 3 ]).storeBy(x => x % 2);
          * store.get(1).value //=> [ 1, 3 ]
          * ```
-         * This allows the groups to be lazy
+         * This allows the groups to be lazy.
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} could cause unexpected behaviours (Some elements could not be present)
          * @param f A combination function
          */
         storeBy(f) {
@@ -334,10 +345,14 @@ function LazyList(source) {
         split(n, mode, lazy, def) {
             return new LazySplitList(this, n, mode, lazy, def);
         }
+        /** Outputs an iterable that will contain the current one as its only element */
+        wrap() {
+            return new LazyWrapList(this);
+        }
         /**
          * Returns a {@link LazySet} that contains the elements of the list.
          * The set is lazy, this means that the elements are not calculated until it is checked if they are present.
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} could cause unexpected behaviours (Some elements could not be present)
          */
         toSet() {
             return new LazySet(this);
@@ -345,7 +360,7 @@ function LazyList(source) {
         /**
          * Returns a {@link LazyMap} that contains the elements of the list.
          * The map is lazy, this means that the elements are not calculated until it is checked if they are present or the key is requested.
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyMap} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyMap} could cause unexpected behaviours (Some elements could not be present)
          * @param getK The function that will be used to get the key of each element
          * @param getV The function that will be used to get the value of each element; If not provided the element itself will be used
          */
@@ -354,7 +369,7 @@ function LazyList(source) {
         }
         /**
          * Caches the list's calculated elements, this prevent them from passing inside the pipeline again
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyCacheList} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyCacheList} could cause unexpected behaviours (Some elements could not be present)
          */
         cache() {
             return new LazyCacheList(this);
@@ -380,10 +395,6 @@ function LazyList(source) {
          */
         catch(f) {
             return new LazySelectList(this, (x, i, list) => Promise.resolve(x).catch(e => f(e, i, list)));
-        }
-        /** Outputs a {@link LazyFixedList} that will contain the current one as its only element */
-        wrap() {
-            return new LazyFixedList([this]);
         }
         /**
          * Filters the list returning only the elements which are instances of {@link ctor}
@@ -420,10 +431,10 @@ function LazyList(source) {
          * Returns a section of the list, starting at {@link start} and with {@link length} elements
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
          * @param length The length of the section; Can be whatever you can pass as the first argument of {@link take}
-         * @param mode If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many `undefined` as needed
+         * @param mode If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many {@link def} as needed
          */
-        slice(start, length, mode) {
-            return this.skip(start).take(length, mode);
+        slice(start, length, mode, def) {
+            return this.skip(start).take(length, mode, def);
         }
         //////////////////////////////////////////////////// AGGREGATE ////////////////////////////////////////////////////
         /**
@@ -431,7 +442,7 @@ function LazyList(source) {
          * @param n The index; If negative it starts from the end
          * @param def The default value
          */
-        at(n, def = null) {
+        at(n, def) {
             if (n < 0) {
                 const temp = this.value;
                 if (n < -temp.length)
@@ -444,7 +455,7 @@ function LazyList(source) {
          * Gets the last element of the list or {@link def} as default if it's empty
          * @param def The default value
          */
-        last(def = null) {
+        last(def) {
             for (const elm of this)
                 def = elm;
             return def;
@@ -454,7 +465,7 @@ function LazyList(source) {
          * Can be used as `next()` when the source iterable is a generator
          * @param def The default value
          */
-        first(def = null) {
+        first(def) {
             const temp = this[Symbol.iterator]().next();
             return temp.done
                 ? def
@@ -507,6 +518,18 @@ function LazyList(source) {
                 if (f ? f(elm, i++, this) : elm)
                     return true;
             return false;
+        }
+        /**
+         * Tells if the element at the given index can be retrieved
+         * @param n The index to check; If negative it starts from the end
+         */
+        inBound(n) {
+            const temp = this.fastCount;
+            return ~temp
+                ? n < 0
+                    ? (temp + n) >= 0
+                    : n < temp
+                : this.any((_, i) => i >= n);
         }
         /**
          * Returns `true` if a value is in the list; If {@link value} is not provided, it will return `true` if there is at least an element in the list
@@ -625,7 +648,8 @@ function LazyList(source) {
     LazyList.LazySourceList = LazySourceList;
     /**
      * Output of {@link LazyList}.
-     * Represents a list with the same number of elements as {@link source}
+     * Represents a list with the same number of elements as {@link source}.
+     * It is used even by lists that need the {@link LazyFixedList.fastCount} of the {@link source} to calculate theirs
      */
     class LazyFixedList extends LazySourceList {
         get fastCount() {
@@ -647,6 +671,9 @@ function LazyList(source) {
                         ? Math.floor(Math.random() * (this.top - this.bottom + 1)) + this.bottom
                         : Math.floor(Math.random() * (this.top + 1))
                     : Math.random();
+        }
+        get fastCount() {
+            return Infinity;
         }
     }
     LazyList.LazyRandList = LazyRandList;
@@ -675,8 +702,14 @@ function LazyList(source) {
         }
     }
     LazyList.LazyRangeList = LazyRangeList;
-    /** Output of {@link buffer} */
+    /** Iterable that stores only a cached chunk of data at a time */
     class LazyBufferList extends LazyAbstractList {
+        /**
+         * Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range.
+         * Can be freely accessed by index
+         * @param f A function that generates a chunk of data starting from the given index
+         * @param offset If an index is out of range, the loaded chunk will start this amount of elements before the index
+         */
         constructor(f, offset = 0) {
             super();
             this.f = f;
@@ -685,20 +718,22 @@ function LazyList(source) {
             this.buffer = [];
         }
         *[Symbol.iterator]() {
-            for (var i = 0; this.tryBuffer(i); i++)
+            for (var i = 0; this.inBound(i); i++)
                 yield this.buffer[i - this.start];
         }
         at(n, def) {
-            return this.tryBuffer(n)
+            return this.inBound(n)
                 ? this.buffer[n - this.start]
                 : def;
         }
         /**
-         * Tells if the element at the index can be retrieved
-         * @param n The index to check
-         * @param read If false, only the current buffer is checked
+         * Tells if the element at the given index can be retrieved
+         * @param n The index to check; If negative it starts from the end
+         * @param read  If false, only the current buffer is checked
          */
-        tryBuffer(n, read = true) {
+        inBound(n, read = true) {
+            if (n < 0)
+                return super.inBound(n);
             const real = n - this.start;
             if (0 <= real && real < this.buffer.length)
                 return true;
@@ -706,10 +741,79 @@ function LazyList(source) {
                 return false;
             this.start = Math.max(0, n - this.offset);
             this.buffer = this.f(this.start, this);
-            return this.tryBuffer(n, false);
+            return this.inBound(n, false);
         }
     }
     LazyList.LazyBufferList = LazyBufferList;
+    /** Similiar to {@link LazyBufferList}, but allows the storage of the current position */
+    class BufferIterator extends LazyBufferList {
+        constructor() {
+            super(...arguments);
+            _BufferIterator_currentIndex.set(this, -1);
+            _BufferIterator_current.set(this, void 0);
+        }
+        *[(_BufferIterator_currentIndex = new WeakMap(), _BufferIterator_current = new WeakMap(), Symbol.iterator)]() {
+            for (this.next(); this.inBound(__classPrivateFieldGet(this, _BufferIterator_currentIndex, "f")); this.currentIndex++)
+                yield __classPrivateFieldGet(this, _BufferIterator_current, "f");
+        }
+        /**
+         * Clones the current iterator into another
+         * @param target The iterator to clone into; If not provided, a new iterator will be created
+         */
+        clone(target) {
+            return Object.assign(target ?? new BufferIterator(null), this);
+        }
+        /**
+         * Reaches the {@link currentIndex} of {@link target}
+         * @param target The iterator to reach
+         * @returns The new current item
+         */
+        reach(target) {
+            return this.move(target.currentIndex, true).current;
+        }
+        /**
+         * Moves the current item by {@link n} steps
+         * @param n The number of steps to move; If not provided, the iterator will move by `1`
+         * @returns The new current item
+         */
+        next(n = 1) {
+            this.currentIndex += n;
+            return this.current;
+        }
+        /**
+         * Moves the current item by {@link n} steps
+         * @param n The number of steps to move; If not provided, the iterator will move by `-1`
+         * @param absolute If true, the {@link currentIndex} will be set exactly to {@link n}
+         * @returns The iterator itself
+         */
+        move(n = -1, absolute = false) {
+            this.currentIndex = absolute ? n : this.currentIndex + n;
+            return this;
+        }
+        /**
+         * Returns the element at {@link n} steps from the current item
+         * @param n The number of steps to move; If not provided, the iterator will move by `1`
+         */
+        peek(n = 1) {
+            const { buffer, currentIndex, current } = this;
+            try {
+                return this.next(n);
+            }
+            finally {
+                // Restores the previous state of the iterator to prevent useless recalculations
+                this.buffer = buffer;
+                __classPrivateFieldSet(this, _BufferIterator_currentIndex, currentIndex, "f");
+                __classPrivateFieldSet(this, _BufferIterator_current, current, "f");
+            }
+        }
+        /** Obtains the index of the current element of the iterator */
+        get currentIndex() { return __classPrivateFieldGet(this, _BufferIterator_currentIndex, "f"); }
+        set currentIndex(value) { __classPrivateFieldSet(this, _BufferIterator_current, (__classPrivateFieldSet(this, _BufferIterator_currentIndex, value, "f")) < 0 ? undefined : this.at(__classPrivateFieldGet(this, _BufferIterator_currentIndex, "f")), "f"); }
+        /** Obtains the current element of the iterator */
+        get current() { return __classPrivateFieldGet(this, _BufferIterator_current, "f"); }
+        set current(value) { __classPrivateFieldSet(this, _BufferIterator_currentIndex, this.indexOf(__classPrivateFieldSet(this, _BufferIterator_current, value, "f")), "f"); }
+    }
+    LazyList.BufferIterator = BufferIterator;
     /** Output of {@link distinct} */
     class LazyDistinctList extends LazySourceList {
         constructor(source, f) {
@@ -875,7 +979,7 @@ function LazyList(source) {
     LazyList.LazyAppendList = LazyAppendList;
     /** Output of {@link defaultIfEmpty} */
     class LazyDefaultIfEmptyList extends LazyFixedList {
-        constructor(source, def = null) {
+        constructor(source, def) {
             super(source);
             this.def = def;
         }
@@ -916,6 +1020,15 @@ function LazyList(source) {
         }
     }
     LazyList.LazyReverseList = LazyReverseList;
+    /** Output of {@link shuffle} */
+    class LazyShuffleList extends LazyFixedList {
+        *[Symbol.iterator]() {
+            const temp = this.base();
+            while (temp.length)
+                yield temp.splice(Math.floor(Math.random() * temp.length), 1)[0];
+        }
+    }
+    LazyList.LazyShuffleList = LazyShuffleList;
     /** Output of {@link sort} */
     class LazySortList extends LazyFixedList {
         constructor(source, f, desc = false) {
@@ -962,7 +1075,7 @@ function LazyList(source) {
     }
     LazyList.LazySpliceList = LazySpliceList;
     /** Output of {@link LazyAbstractList.fixedCount} */
-    class LazyFixedCountList extends LazyFixedList {
+    class LazyFixedCountList extends LazySourceList {
         constructor(source, n) {
             super(source);
             this.n = n;
@@ -1014,13 +1127,13 @@ function LazyList(source) {
     LazyList.LazySkipList = LazySkipList;
     /** Output of {@link LazyAbstractList.take} */
     class LazyTakeList extends LazySourceList {
-        constructor(source, p, mode = false, def = undefined) {
+        constructor(source, p, mode = false, def) {
             super(source);
             this.p = p;
             this.mode = mode;
             this.def = def;
         }
-        static *take(iter, n, mode = false, def = undefined) {
+        static *take(iter, n, mode = false, def) {
             for (var value, i = 0; i < n; i++) // If this were a foreach loop the first element after "n" would have been calculated too
                 if (iter.done = ({ value } = iter.next()).done)
                     if (!mode)
@@ -1051,7 +1164,7 @@ function LazyList(source) {
     LazyList.LazyTakeList = LazyTakeList;
     /** Output of {@link padStart} */
     class LazyPadStartList extends LazySourceList {
-        constructor(source, n, def = undefined) {
+        constructor(source, n, def) {
             super(source);
             this.n = n;
             this.def = def;
@@ -1064,8 +1177,34 @@ function LazyList(source) {
         }
     }
     LazyList.LazyPadStartList = LazyPadStartList;
+    /** Output of {@link accumulate} */
+    class LazyAccumulateList extends LazyFixedList {
+        constructor(source, f, out, hasOut = arguments.length > 2) {
+            super(source);
+            this.f = f;
+            this.out = out;
+            this.hasOut = hasOut;
+        }
+        *[Symbol.iterator]() {
+            var i = 0;
+            var out;
+            var value;
+            const iter = this.source[Symbol.iterator]();
+            if (!this.hasOut)
+                if (!({ value } = iter.next()).done)
+                    yield out = value,
+                        i++;
+                else
+                    return;
+            else
+                out = this.out; // The initial value is not yielded if its from input
+            for (; !({ value } = iter.next()).done; i++)
+                yield out = this.f(out, value, i, this);
+        }
+    }
+    LazyList.LazyAccumulateList = LazyAccumulateList;
     /** Output of {@link zip} */
-    class LazyZipList extends LazySourceList {
+    class LazyZipList extends LazyFixedList {
         constructor(source, other, f, mode = JoinMode.inner) {
             super(source);
             this.other = other;
@@ -1086,10 +1225,24 @@ function LazyList(source) {
                     : [a.value, b.value];
             }
         }
+        get fastCount() {
+            const source = super.fastCount;
+            const other = fastCount(this.other);
+            switch (this.mode) {
+                case JoinMode.inner:
+                    return ~source && ~other ? Math.min(source, other) : -1;
+                case JoinMode.left:
+                    return ~source ? source : -1;
+                case JoinMode.right:
+                    return ~other ? other : -1;
+                case JoinMode.outer:
+                    return ~source && ~other ? Math.max(source, other) : -1;
+            }
+        }
     }
     LazyList.LazyZipList = LazyZipList;
     /** Output of {@link join} */
-    class LazyJoinList extends LazySourceList {
+    class LazyJoinList extends LazyFixedList {
         constructor(source, other, p, f, mode = JoinMode.inner) {
             super(source);
             this.other = other;
@@ -1103,18 +1256,15 @@ function LazyList(source) {
             // Inner
             var i = 0;
             for (const a of this.source) {
-                var k = 0;
                 const aE = cacheA[i] ?? (cacheA[i] = { v: a });
-                for (const b of this.other) {
-                    const bE = cacheB[k] ?? (cacheB[k] = { v: b });
-                    const temp = !this.p || this.p(a, b, i, this);
+                for (const bE of (i ? cacheB : new LazySelectList(this.other, (v, i) => cacheB[i] = { v }))) {
+                    const temp = !this.p || this.p(a, bE.v, i, this);
                     aE.c || (aE.c = temp);
                     bE.c || (bE.c = temp);
                     if (temp)
                         yield this.f
-                            ? this.f(a, b, i, this)
-                            : [a, b];
-                    k++;
+                            ? this.f(a, bE.v, i, this)
+                            : [a, bE.v];
                 }
                 i++;
             }
@@ -1133,8 +1283,54 @@ function LazyList(source) {
                             ? this.f(undefined, elm.v, -1, this)
                             : [undefined, elm.v];
         }
+        get fastCount() {
+            if (this.p)
+                return -1;
+            const source = super.fastCount;
+            if (!~source)
+                return -1;
+            const other = fastCount(this.other);
+            return ~other
+                ? source * other
+                : -1;
+        }
     }
     LazyList.LazyJoinList = LazyJoinList;
+    /** Output of {@link LazyAbstractList.combinations} */
+    class LazyCombinationsList extends LazyFixedList {
+        constructor(source, depth = 2) {
+            super(source);
+            this.depth = depth;
+        }
+        static fact(n) {
+            var out = 1;
+            for (var i = 2; i <= n; i++)
+                out *= i;
+            return out;
+        }
+        static *combinations(inp, depth = 2, start = 0, stack = []) {
+            if (depth) // If there is more length to add to the combination
+             {
+                const { length } = stack;
+                for (var i = start; inp.inBound(i); i++) // For each element in the input
+                    stack[length] = inp.at(i), // Add it to the stack
+                        yield* this.combinations(inp, depth - 1, i + 1, stack); // Go to the next element of the combination
+                stack.pop(); // Removes the element added by this level of recursion
+            }
+            else
+                yield stack.slice(); // If there is no more length to add to the combination, yield A COPY of the combination
+        }
+        *[Symbol.iterator]() {
+            yield* LazyCombinationsList.combinations(new LazyCacheList(this.source), this.depth);
+        }
+        get fastCount() {
+            const temp = super.fastCount;
+            return ~temp
+                ? LazyCombinationsList.fact(temp) / (LazyCombinationsList.fact(temp - this.depth) * LazyCombinationsList.fact(this.depth))
+                : -1;
+        }
+    }
+    LazyList.LazyCombinationsList = LazyCombinationsList;
     /** Output of {@link LazyAbstractList.storeBy} */
     class LazyStore {
         constructor(source, f) {
@@ -1147,7 +1343,7 @@ function LazyList(source) {
         }
         /**
          * Returns the list of the elements with the given key.
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} could cause unexpected behaviours (Some elements could not be present)
          * @param k The key to search for
          */
         get(k) {
@@ -1232,7 +1428,7 @@ function LazyList(source) {
     LazyList.LazyGroupByList = LazyGroupByList;
     /** Output of {@link split} */
     class LazySplitList extends LazySourceList {
-        constructor(source, n, mode = false, lazy = false, def = undefined) {
+        constructor(source, n, mode = false, lazy = false, def) {
             super(source);
             this.n = n;
             this.mode = mode;
@@ -1254,6 +1450,17 @@ function LazyList(source) {
         }
     }
     LazyList.LazySplitList = LazySplitList;
+    /** Output of {@link wrap} */
+    class LazyWrapList extends LazySourceList {
+        constructor(source) { super(source); }
+        *[Symbol.iterator]() {
+            yield this.source;
+        }
+        get fastCount() {
+            return 1;
+        }
+    }
+    LazyList.LazyWrapList = LazyWrapList;
     /** Common functionalities of cached lists */
     class LazyAbstractCacheList extends LazySourceList {
         constructor() {
@@ -1265,15 +1472,15 @@ function LazyList(source) {
             yield* this.cached;
             yield* this.calcRest();
         }
-        /** Calculates the remaining elements one at a time */
-        *calcRest() {
-            for (var value; !({ value, done: this.done } = this.iter.next()).done;)
-                yield this.save(value);
-        }
         has(value) {
             if (!arguments.length)
                 return this.done ? this.saved > 0 : super.has();
             return super.has(value);
+        }
+        /** Calculates the remaining elements one at a time */
+        *calcRest() {
+            for (var value; !({ value, done: this.done } = this.iter.next()).done;)
+                yield this.save(value);
         }
         /** Completes the cache and returns it */
         complete() {
@@ -1308,13 +1515,17 @@ function LazyList(source) {
                     return true;
             return false;
         }
-        add(value) {
-            this.save(value);
-            return this;
-        }
         save(value) {
             this.cached.add(value);
             return value;
+        }
+        /**
+         * Adds a value to the set
+         * @param value The value to add
+         */
+        add(value) {
+            this.save(value);
+            return this;
         }
         get saved() {
             return this.cached.size;
@@ -1330,6 +1541,17 @@ function LazyList(source) {
             this.processed = 0;
             this.cached = new Map();
         }
+        save(value) {
+            const k = this.getK(value, this.processed, this);
+            const v = this.getV ? this.getV(value, this.processed, this) : value;
+            this.cached.set(k, v);
+            this.processed++;
+            return [k, v];
+        }
+        /**
+         * Gets if the map contains the given key
+         * @param value The key to check
+         */
         hasKey(value) {
             if (this.cached.has(value))
                 return true;
@@ -1338,24 +1560,27 @@ function LazyList(source) {
                     return true;
             return false;
         }
-        get(key) {
+        /**
+         * Gets the value for the given key
+         * @param key The key to get the value for
+         * @param def The default value to return if the key is not found
+         */
+        get(key, def) {
             if (this.cached.has(key))
                 return this.cached.get(key);
             for (const [k, v] of this.calcRest())
                 if (k === key)
                     return v;
-            return undefined;
+            return def;
         }
+        /**
+         * Adds a new key-value pair to the map
+         * @param key The key to add
+         * @param value The value to add
+         */
         set(key, value) {
             this.cached.set(key, value);
             return this;
-        }
-        save(value) {
-            const k = this.getK(value, this.processed, this);
-            const v = this.getV ? this.getV(value, this.processed, this) : value;
-            this.cached.set(k, v);
-            this.processed++;
-            return [k, v];
         }
         get saved() {
             return this.cached.size;
@@ -1368,21 +1593,33 @@ function LazyList(source) {
             super(...arguments);
             this.cached = [];
         }
-        at(n, def = null) {
+        at(n, def) {
             return n < 0
                 ? this.done
-                    ? this.at(this.cached.length + n, def)
+                    ? this.at(this.saved + n, def)
                     : super.at(n, def)
-                : n < this.cached.length
+                : n < this.saved
                     ? this.cached[n]
                     : this.done
                         ? def
                         : super.at(n, def);
         }
-        last(def = null) {
+        last(def) {
             return this.done
                 ? this.cached[this.cached.length - 1]
                 : super.last(def);
+        }
+        inBound(n) {
+            if (n < 0)
+                return this.done
+                    ? (this.saved + n) >= 0
+                    : super.inBound(n);
+            if (n < this.saved)
+                return true;
+            for (const _ of this.calcRest())
+                if (n < this.saved)
+                    return true;
+            return false;
         }
         save(value) {
             this.cached.push(value);

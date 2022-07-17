@@ -1,13 +1,18 @@
 
 /**
- * Returns a {@link LazyList.LazyAbstractList} based on an iterable.
+ * Returns a {@link LazyList.LazyAbstractList} based on an iterable or an non-iterable iterator.
+ * If the {@link source} is a non-iterable iterator, it gets wrapped in a new object that returns {@link source} in its {@link Symbol.iterator} method.
  * If {@link source} is already a {@link LazyList.LazyAbstractList}, it gets returned directly, otherwise it gets wrapped in a {@link LazyList.LazyFixedList}
- * @param source The iterable
+ * @param source The iterable/iterator
+ * @param force If `true`, {@link source} is always wrapped
  */
-function LazyList<T = any>(source?: Iterable<T>): LazyList.LazyAbstractList<T> {
-    return source instanceof LazyList.LazyAbstractList
-        ? source
-        : new LazyList.LazyFixedList(source);
+ function LazyList<T = any>(source?: Iterable<T> | Iterator<T>, force: boolean = false): LazyList.LazyAbstractList<T> {
+    return !force && source instanceof LazyList.LazyAbstractList
+        ? <any>source
+        : new LazyList.LazyFixedList(
+            typeof source[Symbol.iterator] === 'function'               // If the source is iterable
+                ? <Iterable<T>>source                                   // Wrap it directly
+                : { [Symbol.iterator]: () => <Iterator<T>>source });    // Otherwise try to use it as an iterator
 }
 
 namespace LazyList {
@@ -48,7 +53,7 @@ namespace LazyList {
      * @param ctor The constructor to which you want to change the base class; If not provided, it will apply the functionalities to {@link Generator}
      * @returns The library itself
      */
-    export function attachIterator(ctor?: abstract new (...args: any[]) => any): typeof LazyList {
+    export function injectInto(ctor?: abstract new (...args: any[]) => any): typeof LazyList {
         //@ts-ignore
         (ctor?.prototype ?? (function*(){})().__proto__.__proto__.__proto__).__proto__ = LazyAbstractList.prototype;
         return LazyList;
@@ -68,14 +73,6 @@ namespace LazyList {
                     : source instanceof LazyList.LazyAbstractList
                         ? source.fastCount
                         : -1;
-    }
-
-    /**
-     * Creates a {@link LazyFixedList} based on a non-iterable iterator
-     * @param iter The iterator
-     */
-    export function fromIterator<T>(iter: Iterator<T>): LazyFixedList<T> {
-        return new LazyFixedList({ [Symbol.iterator]: () => iter });
     }
 
     /**
@@ -100,16 +97,6 @@ namespace LazyList {
         return new LazyRangeList(end, start, step, flip);
     }
 
-    /**
-     * Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range.
-     * Can be freely accessed by index
-     * @param f A function that generates a chunk of data starting from the given index
-     * @param offset If an index is out of range, the loaded chunk will start this amount of elements before the index
-     */
-    export function buffer<T>(f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>, offset?: number) {
-        return new LazyBufferList(f, offset);
-    }
-
     /** An iterable wrapper with helper functions */
     export abstract class LazyAbstractList<T> {
         abstract [Symbol.iterator](): Generator<T>;
@@ -118,8 +105,8 @@ namespace LazyList {
          * Ensures every element of the list shows up only once
          * @param f A conversion function that returns the the part of the element to check duplicates for; If omitted, the element itself will be used
          */
-        distinct<TKey = T>(f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) {
-            return new LazyDistinctList<TKey, T>(this, f);
+        distinct<TKey = T>(f?: Convert<T, TKey, LazyDistinctList<T, TKey>>) {
+            return new LazyDistinctList<T, TKey>(this, f);
         }
 
         /**
@@ -127,8 +114,8 @@ namespace LazyList {
          * Every time the iteration starts, {@link other} is completely calculated
          * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
          */
-        except<TKey = T>(other: Iterable<TKey>, f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) {
-            return new LazyExceptList<TKey, T>(this, other, f);
+        except<TKey = T>(other: Iterable<TKey>, f?: Convert<T, TKey, LazyExceptList<T, TKey>>) {
+            return new LazyExceptList<T, TKey>(this, other, f);
         }
 
         /**
@@ -245,6 +232,14 @@ namespace LazyList {
         }
 
         /**
+         * Shuffles the list in a randomic way.
+         * Non lazy
+         */
+        shuffle() {
+            return new LazyShuffleList(this);
+        }
+
+        /**
          * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} since it would be wrong).
          * Non lazy
          * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
@@ -294,7 +289,8 @@ namespace LazyList {
 
         /**
          * Force the list to have at least {@link n} elements by concatenating as many {@link def} as needed at the beginning of the list.
-         * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument)
+         * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument).
+         * Non lazy
          * @param n The number of desired elements
          * @param def The value to use if the list is too short
          */
@@ -303,9 +299,19 @@ namespace LazyList {
         }
 
         /**
+         * Aggregates the list based on {@link f}.
+         * Similiar to {@link aggregate} but yields the intermediate results
+         * @param f A combination function
+         * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration)
+         */
+        accumulate<TResult = T>(f: Combine<TResult, T, TResult, LazyAccumulateList<T, TResult>>, out?: TResult) {
+            return new LazyAccumulateList<T, TResult>(this, f, out, arguments.length > 1);
+        }
+
+        /**
          * Combines the current list with {@link other} based on {@link f}
          * @param other An iterable
-         * @param f A combination function
+         * @param f A combination function, if not provided the pairs will be put in a tuple
          * @param mode Different length handling
          */
         zip<TOther, TResult = [ T, TOther ]>(other: Iterable<TOther>, f?: Combine<T, TOther, TResult, LazyZipList<T, TOther, TResult>>, mode?: JoinMode) {
@@ -317,15 +323,23 @@ namespace LazyList {
          * If no {@link p} argument is supplied, the method does the cartesian product of the two lists (And {@link mode} becomes useless).
          * If {@link mode} is not {@link JoinMode.inner}, `undefined` will be supplied as the missing element.
          * The index available in the functions is the one of the "left" part in the {@link JoinMode.inner} operation, and `-1` in the {@link JoinMode.outer} part.
-         * The {@link JoinMode.right} part ({@link other}) will be calculeted one time for each element of the {@link JoinMode.left} part and must be of the same size each time.
-         * Wrap {@link other} in a {@link LazyCacheList} (Or use the {@link cache} method) to cache the elements
          * @param other An iterable
          * @param p A filter function
-         * @param f A combination function
+         * @param f A combination function, if not provided pairs will be put in a tuple
          * @param mode Different length handling
          */
         join<TOther, TResult = [ T, TOther ]>(other: Iterable<TOther>, p?: Combine<T, TOther, boolean, LazyJoinList<T, TOther, TResult>>, f?: Combine<T, TOther, TResult, LazyJoinList<T, TOther, TResult>>, mode?: JoinMode) {
             return new LazyJoinList<T, TOther, TResult>(this, other, p, f, mode);
+        }
+
+        /**
+         * Generates all the possible combinations of length {@link depth} of the elements of the list.
+         * Only one combination will be generated for each pair of elements from the two lists (If there is "(a, b)" there will not be "(b, a)").
+         * The index available in the functions is the one of the first element of the group
+         * @param depth The length of the each combination
+         */
+        combinations(depth?: number) {
+            return new LazyCombinationsList<T>(this, depth);
         }
 
         /**
@@ -336,11 +350,12 @@ namespace LazyList {
          * const store = LazyList.from([ 1, 2, 3 ]).storeBy(x => x % 2);
          * store.get(1).value //=> [ 1, 3 ]
          * ```
-         * This allows the groups to be lazy
+         * This allows the groups to be lazy.
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} could cause unexpected behaviours (Some elements could not be present)
          * @param f A combination function
          */
-        storeBy<TKey>(f: Convert<T, TKey, LazyStoreByList<TKey, T>>) {
-            return new LazyStore<TKey, T>(this, f);
+        storeBy<TKey>(f: Convert<T, TKey, LazyStoreByList<T, TKey>>) {
+            return new LazyStore<T, TKey>(this, f);
         }
 
         /**
@@ -348,8 +363,8 @@ namespace LazyList {
          * Non lazy
          * @param f A combination function
          */
-        groupBy<TKey>(f: Convert<T, TKey, LazyGroupByList<TKey, T>>) {
-            return new LazyGroupByList<TKey, T>(this, f);
+        groupBy<TKey>(f: Convert<T, TKey, LazyGroupByList<T, TKey>>) {
+            return new LazyGroupByList<T, TKey>(this, f);
         }
 
         /**
@@ -370,10 +385,15 @@ namespace LazyList {
             return new LazySplitList(this, n, mode, lazy, def);
         }
 
+        /** Outputs an iterable that will contain the current one as its only element */
+        wrap() {
+            return new LazyWrapList<T, this>(this);
+        }
+
         /**
          * Returns a {@link LazySet} that contains the elements of the list.
          * The set is lazy, this means that the elements are not calculated until it is checked if they are present.
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} could cause unexpected behaviours (Some elements could not be present)
          */
         toSet() {
             return new LazySet(this);
@@ -382,7 +402,7 @@ namespace LazyList {
         /**
          * Returns a {@link LazyMap} that contains the elements of the list.
          * The map is lazy, this means that the elements are not calculated until it is checked if they are present or the key is requested.
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyMap} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyMap} could cause unexpected behaviours (Some elements could not be present)
          * @param getK The function that will be used to get the key of each element
          * @param getV The function that will be used to get the value of each element; If not provided the element itself will be used
          */
@@ -392,7 +412,7 @@ namespace LazyList {
 
         /**
          * Caches the list's calculated elements, this prevent them from passing inside the pipeline again
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyCacheList} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyCacheList} could cause unexpected behaviours (Some elements could not be present)
          */
         cache() {
             return new LazyCacheList(this);
@@ -422,11 +442,6 @@ namespace LazyList {
          */
         catch<TAwaited>(this: LazyAbstractList<PromiseLike<TAwaited>>, f: Convert<any, TAwaited, LazySelectList<PromiseLike<TAwaited>, Promise<TAwaited>>>) {
             return new LazySelectList<PromiseLike<TAwaited>, Promise<TAwaited>>(this, (x, i, list) => Promise.resolve(x).catch(e => f(e, i, list)));
-        }
-
-        /** Outputs a {@link LazyFixedList} that will contain the current one as its only element */
-        wrap() {
-            return new LazyFixedList([ this ]);
         }
 
         /**
@@ -468,10 +483,10 @@ namespace LazyList {
          * Returns a section of the list, starting at {@link start} and with {@link length} elements
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
          * @param length The length of the section; Can be whatever you can pass as the first argument of {@link take}
-         * @param mode If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many `undefined` as needed
+         * @param mode If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many {@link def} as needed
          */
-        slice(start: Predicate<T, LazySkipList<T>> | number, length: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean) {
-            return this.skip(start).take(length, mode);
+        slice(start: Predicate<T, LazySkipList<T>> | number, length: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T) {
+            return this.skip(start).take(length, mode, def);
         }
 
         //////////////////////////////////////////////////// AGGREGATE ////////////////////////////////////////////////////
@@ -481,7 +496,7 @@ namespace LazyList {
          * @param n The index; If negative it starts from the end
          * @param def The default value
          */
-        at(n: number, def: T = null): T {
+        at(n: number, def?: T): T {
             if (n < 0)
             {
                 const temp = this.value;
@@ -496,7 +511,7 @@ namespace LazyList {
          * Gets the last element of the list or {@link def} as default if it's empty
          * @param def The default value
          */
-        last(def: T = null) {
+        last(def?: T) {
             for (const elm of this)
                 def = elm;
             return def;
@@ -507,7 +522,7 @@ namespace LazyList {
          * Can be used as `next()` when the source iterable is a generator
          * @param def The default value
          */
-        first(def: T = null): T {
+        first(def?: T): T {
             const temp = this[Symbol.iterator]().next();
             return temp.done
                 ? def
@@ -567,6 +582,19 @@ namespace LazyList {
                 if (f ? f(elm, i++, this) : elm)
                     return true;
             return false;
+        }
+
+        /**
+         * Tells if the element at the given index can be retrieved
+         * @param n The index to check; If negative it starts from the end
+         */
+        inBound(n: number) {
+            const temp = this.fastCount;
+            return ~temp
+                ? n < 0
+                    ? (temp + n) >= 0
+                    : n < temp
+                : this.any((_, i) => i >= n);
         }
 
         /**
@@ -695,10 +723,11 @@ namespace LazyList {
 
     /**
      * Output of {@link LazyList}.
-     * Represents a list with the same number of elements as {@link source}
+     * Represents a list with the same number of elements as {@link source}.
+     * It is used even by lists that need the {@link LazyFixedList.fastCount} of the {@link source} to calculate theirs
      */
     export class LazyFixedList<I, O = I> extends LazySourceList<I, O> {
-        get fastCount(): number {
+        get fastCount() {
             return fastCount(this.source);
         }
     }
@@ -714,6 +743,10 @@ namespace LazyList {
                         ? Math.floor(Math.random() * (this.top - this.bottom + 1)) + this.bottom
                         : Math.floor(Math.random() * (this.top + 1))
                     : Math.random();
+        }
+
+        get fastCount() {
+            return Infinity;
         }
     }
 
@@ -741,42 +774,125 @@ namespace LazyList {
         }
     }
 
-    /** Output of {@link buffer} */
+    /** Iterable that stores only a cached chunk of data at a time */
     export class LazyBufferList<T> extends LazyAbstractList<T> {
         start: number = 0;
         buffer: ReadOnlyIndexable<T> = [];
+
+        /**
+         * Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range.
+         * Can be freely accessed by index
+         * @param f A function that generates a chunk of data starting from the given index
+         * @param offset If an index is out of range, the loaded chunk will start this amount of elements before the index
+         */
         constructor(public f: (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>, public offset: number = 0) { super(); }
 
         *[Symbol.iterator]() {
-            for (var i = 0; this.tryBuffer(i); i++)
+            for (var i = 0; this.inBound(i); i++)
                 yield this.buffer[i - this.start];
         }
 
         at(n: number, def?: T): T {
-            return this.tryBuffer(n)
+            return this.inBound(n)
                 ? this.buffer[n - this.start]
                 : def;
         }
 
         /**
-         * Tells if the element at the index can be retrieved
-         * @param n The index to check
-         * @param read If false, only the current buffer is checked
+         * Tells if the element at the given index can be retrieved
+         * @param n The index to check; If negative it starts from the end
+         * @param read  If false, only the current buffer is checked 
          */
-        tryBuffer(n: number, read: boolean = true) {
+        inBound(n: number, read: boolean = true) {
+            if (n < 0)
+                return super.inBound(n);
+            
             const real = n - this.start;
             if (0 <= real && real < this.buffer.length) return true;
             if (!read) return false;
 
             this.start = Math.max(0, n - this.offset);
             this.buffer = this.f(this.start, this);
-            return this.tryBuffer(n, false);
+            return this.inBound(n, false);
         }
+    }
+    
+    /** Similiar to {@link LazyBufferList}, but allows the storage of the current position */
+    export class BufferIterator<T> extends LazyBufferList<T> {
+
+        *[Symbol.iterator]() {
+            for (this.next(); this.inBound(this.#currentIndex); this.currentIndex++)
+                yield this.#current;
+        }
+
+        /**
+         * Clones the current iterator into another
+         * @param target The iterator to clone into; If not provided, a new iterator will be created
+         */
+        clone(target?: BufferIterator<T>) {
+            return Object.assign(target ?? new BufferIterator(null), this);
+        }
+    
+        /**
+         * Reaches the {@link currentIndex} of {@link target}
+         * @param target The iterator to reach
+         * @returns The new current item
+         */
+        reach(target: BufferIterator<T>) {
+            return this.move(target.currentIndex, true).current;
+        }
+    
+        /**
+         * Moves the current item by {@link n} steps
+         * @param n The number of steps to move; If not provided, the iterator will move by `1`
+         * @returns The new current item
+         */
+        next(n: number = 1) {
+            this.currentIndex += n;
+            return this.current;
+        }
+    
+        /**
+         * Moves the current item by {@link n} steps
+         * @param n The number of steps to move; If not provided, the iterator will move by `-1`
+         * @param absolute If true, the {@link currentIndex} will be set exactly to {@link n}
+         * @returns The iterator itself
+         */
+        move(n: number = -1, absolute: boolean = false) {
+            this.currentIndex = absolute ? n : this.currentIndex + n;
+            return this;
+        }
+    
+        /**
+         * Returns the element at {@link n} steps from the current item
+         * @param n The number of steps to move; If not provided, the iterator will move by `1`
+         */
+        peek(n: number = 1) {
+            const { buffer, currentIndex, current } = this;
+            try { return this.next(n); }
+            finally
+            {
+                // Restores the previous state of the iterator to prevent useless recalculations
+                this.buffer = buffer;
+                this.#currentIndex = currentIndex;
+                this.#current = current;
+            }
+        }
+    
+        /** Obtains the index of the current element of the iterator */
+        get currentIndex() { return this.#currentIndex; }
+        set currentIndex(value: number) { this.#current = (this.#currentIndex = value) < 0 ? undefined : this.at(this.#currentIndex); }
+        #currentIndex: number = -1;
+    
+        /** Obtains the current element of the iterator */
+        get current(): T { return this.#current; }
+        set current(value: T) { this.#currentIndex = this.indexOf(this.#current = value); }
+        #current: T;    
     }
 
     /** Output of {@link distinct} */
-    export class LazyDistinctList<TKey, T> extends LazySourceList<T, T> {
-        constructor (source: Iterable<T>, public f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) { super(source); }
+    export class LazyDistinctList<T, TKey = T> extends LazySourceList<T, T> {
+        constructor (source: Iterable<T>, public f?: Convert<T, TKey, LazyDistinctList<T, TKey>>) { super(source); }
 
         *[Symbol.iterator]() {
             var i = 0;
@@ -788,8 +904,8 @@ namespace LazyList {
     }
 
     /** Output of {@link except} */
-    export class LazyExceptList<TKey, T> extends LazySourceList<T, T> {
-        constructor (source: Iterable<T>, public other: Iterable<TKey>, public f?: Convert<T, TKey, LazyDistinctList<TKey, T>>) { super(source); }
+    export class LazyExceptList<T, TKey = T> extends LazySourceList<T, T> {
+        constructor (source: Iterable<T>, public other: Iterable<TKey>, public f?: Convert<T, TKey, LazyExceptList<T, TKey>>) { super(source); }
 
         *[Symbol.iterator]() {
             var i = 0;
@@ -869,7 +985,7 @@ namespace LazyList {
     }
 
     /** Output of {@link selectMany} */
-    export class LazySelectManyList<I, O> extends LazySourceList<I, O> {
+    export class LazySelectManyList<I, O = I extends Iterable<infer U> ? U : never> extends LazySourceList<I, O> {
         constructor (source: Iterable<I>, public f?: Convert<I, Iterable<O>, LazySelectManyList<I, O>>) { super(source); }
 
         *[Symbol.iterator]() {
@@ -917,7 +1033,7 @@ namespace LazyList {
 
     /** Output of {@link defaultIfEmpty} */
     export class LazyDefaultIfEmptyList<T> extends LazyFixedList<T, T> {
-        constructor (source: Iterable<T>, public def: T = null) { super(source); }
+        constructor (source: Iterable<T>, public def?: T) { super(source); }
 
         *[Symbol.iterator]() {
             var empty = true;
@@ -952,6 +1068,15 @@ namespace LazyList {
             const temp = this.base();
             for (var i = temp.length - 1; i >= 0; i--)
                 yield temp[i];
+        }
+    }
+
+    /** Output of {@link shuffle} */
+    export class LazyShuffleList<T> extends LazyFixedList<T, T> {
+        *[Symbol.iterator]() {
+            const temp = this.base();
+            while (temp.length)
+                yield temp.splice(Math.floor(Math.random() * temp.length), 1)[0];
         }
     }
 
@@ -997,7 +1122,7 @@ namespace LazyList {
     }
 
     /** Output of {@link LazyAbstractList.fixedCount} */
-    export class LazyFixedCountList<T> extends LazyFixedList<T, T> {
+    export class LazyFixedCountList<T> extends LazySourceList<T, T> {
         constructor (source: Iterable<T>, public n: number) { super(source); }
 
         *[Symbol.iterator]() {
@@ -1052,9 +1177,9 @@ namespace LazyList {
 
     /** Output of {@link LazyAbstractList.take} */
     export class LazyTakeList<T> extends LazySourceList<T, T> {
-        constructor (source: Iterable<T>, public p: Predicate<T, LazyTakeList<T>> | number, public mode: JoinMode | boolean = false, public def: T = undefined) { super(source); }
+        constructor (source: Iterable<T>, public p: Predicate<T, LazyTakeList<T>> | number, public mode: JoinMode | boolean = false, public def?: T) { super(source); }
 
-        static *take<T>(iter: MarkedIterator<T>, n: number, mode: JoinMode | boolean = false, def: T = undefined) {
+        static *take<T>(iter: MarkedIterator<T>, n: number, mode: JoinMode | boolean = false, def?: T) {
             for (var value: T, i = 0; i < n; i++) // If this were a foreach loop the first element after "n" would have been calculated too
                 if (iter.done = ({ value } = iter.next()).done)
                     if (!mode)
@@ -1088,7 +1213,7 @@ namespace LazyList {
 
     /** Output of {@link padStart} */
     export class LazyPadStartList<T> extends LazySourceList<T, T> {
-        constructor (source: Iterable<T>, public n: number, public def: T = undefined) { super(source); }
+        constructor (source: Iterable<T>, public n: number, public def?: T) { super(source); }
 
         *[Symbol.iterator]() {
             const [ iter, l ] = this.calcLength();
@@ -1098,8 +1223,30 @@ namespace LazyList {
         }
     }
 
+    /** Output of {@link accumulate} */
+    export class LazyAccumulateList<T, TResult = T> extends LazyFixedList<T, TResult> {
+        constructor (source: Iterable<T>, public f: Combine<TResult, T, TResult, LazyAccumulateList<T, TResult>>, public out?: TResult, public hasOut: boolean = arguments.length > 2) { super(source); }
+
+        *[Symbol.iterator]() {
+            var i = 0;
+            var out: TResult;
+
+            var value: T;
+            const iter = this.source[Symbol.iterator]();
+            if (!this.hasOut)
+                if (!({ value } = iter.next()).done)
+                    yield out = <any>value,
+                    i++;
+                else return;
+            else out = this.out; // The initial value is not yielded if its from input
+
+            for (; !({ value } = iter.next()).done; i++)
+                yield out = this.f(out, value, i, this);
+        }
+    }
+
     /** Output of {@link zip} */
-    export class LazyZipList<A, B, TResult> extends LazySourceList<A, TResult> {
+    export class LazyZipList<A, B, TResult = [ A, B ]> extends LazyFixedList<A, TResult> {
         constructor(source: Iterable<A>, public other: Iterable<B>, public f?: Combine<A, B, TResult, LazyZipList<A, B, TResult>>, public mode: JoinMode = JoinMode.inner) { super(source); }
 
         *[Symbol.iterator]() {
@@ -1117,34 +1264,47 @@ namespace LazyList {
                     : [ a.value, b.value ];
             }
         }
+
+        get fastCount() {
+            const source = super.fastCount;
+            const other = fastCount(this.other);
+            switch (this.mode)
+            {
+                case JoinMode.inner:
+                    return ~source && ~other ? Math.min(source, other) : -1;
+                case JoinMode.left:
+                    return ~source ? source : -1;
+                case JoinMode.right:
+                    return ~other ? other : -1;
+                case JoinMode.outer:
+                    return ~source && ~other ? Math.max(source, other) : -1;
+            }
+        }
     }
 
     /** Output of {@link join} */
-    export class LazyJoinList<A, B, TResult> extends LazySourceList<A, TResult> {
+    export class LazyJoinList<A, B, TResult = [ A, B ]> extends LazyFixedList<A, TResult> {
         constructor(source: Iterable<A>, public other: Iterable<B>, public p?: Combine<A, B, boolean, LazyJoinList<A, B, TResult>>, public f?: Combine<A, B, TResult, LazyJoinList<A, B, TResult>>, public mode: JoinMode = JoinMode.inner) { super(source); }
 
         *[Symbol.iterator]() {
-            type stateList<T> = { v: T, c?: boolean }[];
-            const cacheA: stateList<A> = [];
-            const cacheB: stateList<B> = [];
+            type State<T> = { v: T, c?: boolean };
+            const cacheA: State<A>[] = [];
+            const cacheB: State<B>[] = [];
 
             // Inner
             var i = 0;
             for (const a of this.source)
             {
-                var k = 0;
                 const aE = cacheA[i] ??= { v: a };
-                for (const b of this.other)
+                for (const bE of (i ? cacheB : new LazySelectList(this.other, (v, i) => cacheB[i] = <State<B>>{ v })))
                 {
-                    const bE = cacheB[k] ??= { v: b };
-                    const temp = !this.p || this.p(a, b, i, this);
+                    const temp = !this.p || this.p(a, bE.v, i, this);
                     aE.c ||= temp;
                     bE.c ||= temp;
                     if (temp)
                         yield this.f
-                            ? this.f(a, b, i, this)
-                            : [ a, b ];
-                    k++;
+                            ? this.f(a, bE.v, i, this)
+                            : [ a, bE.v ];
                 }
                 i++;
             }
@@ -1165,25 +1325,70 @@ namespace LazyList {
                             ? this.f(undefined, elm.v, -1, this)
                             : [ undefined, elm.v ];
         }
+
+        get fastCount() {
+            if (this.p) return -1;
+            const source = super.fastCount;
+            if (!~source) return -1;
+            const other = fastCount(this.other);
+            return ~other
+                ? source * other
+                : -1;
+        }
+    }
+
+    /** Output of {@link LazyAbstractList.combinations} */
+    export class LazyCombinationsList<T> extends LazyFixedList<T, T[]> {
+        constructor(source: Iterable<T>, public depth: number = 2) { super(source); }
+
+        static fact(n: number) {
+            var out = 1;
+            for (var i = 2; i <= n; i++)
+                out *= i;
+            return out;
+        }
+
+        static *combinations<T>(inp: LazyCacheList<T>, depth = 2, start = 0, stack: T[] = []) {
+            if (depth)                                                      // If there is more length to add to the combination
+            {
+                const { length } = stack;
+                for (var i = start; inp.inBound(i); i++)                    // For each element in the input
+                    stack[length] = inp.at(i),                              // Add it to the stack
+                    yield* this.combinations(inp, depth - 1, i + 1, stack); // Go to the next element of the combination
+                stack.pop();                                                // Removes the element added by this level of recursion
+            }
+            else yield stack.slice();                                       // If there is no more length to add to the combination, yield A COPY of the combination
+        }
+
+        *[Symbol.iterator]() {
+            yield* LazyCombinationsList.combinations(new LazyCacheList(this.source), this.depth);
+        }
+
+        get fastCount() {
+            const temp = super.fastCount;
+            return ~temp
+                ? LazyCombinationsList.fact(temp) / (LazyCombinationsList.fact(temp - this.depth) * LazyCombinationsList.fact(this.depth))
+                : -1;
+        }
     }
 
     /** Output of {@link LazyAbstractList.storeBy} */
-    export class LazyStore<TKey, T> {
-        map: Map<TKey, LazyStoreByList<TKey, T>> = new Map();
+    export class LazyStore<T, TKey> {
+        map: Map<TKey, LazyStoreByList<T, TKey>> = new Map();
         processed: number = 0;
         done: boolean = false;
         #iter: Iterator<T>;
-        constructor(public source: Iterable<T>, public f: Convert<T, TKey, LazyStoreByList<TKey, T>>) { }
+        constructor(public source: Iterable<T>, public f: Convert<T, TKey, LazyStoreByList<T, TKey>>) { }
 
         /**
          * Returns the list of the elements with the given key.
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} will cause unexpected behaviours (Some elements will not be present)
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} could cause unexpected behaviours (Some elements could not be present)
          * @param k The key to search for
          */
         get(k: TKey) {
             var out = this.map.get(k);
             if (!out)
-                this.map.set(k, out = new LazyStoreByList<TKey, T>(k, this, this.f));
+                this.map.set(k, out = new LazyStoreByList<T, TKey>(k, this, this.f));
             return out;
         }
 
@@ -1194,10 +1399,10 @@ namespace LazyList {
     }
 
     /** Output of {@link LazyStore.get} */
-    export class LazyStoreByList<TKey, T> extends LazyAbstractList<T> {
+    export class LazyStoreByList<T, TKey> extends LazyAbstractList<T> {
         processed: number = 0;
         cached: T[] = [];
-        constructor(public key: TKey, public store: LazyStore<TKey, T>, public f: Convert<T, TKey, LazyStoreByList<TKey, T>>) { super(); }
+        constructor(public key: TKey, public store: LazyStore<T, TKey>, public f: Convert<T, TKey, LazyStoreByList<T, TKey>>) { super(); }
 
         *[Symbol.iterator]() {
             // Pre-cached elements
@@ -1232,13 +1437,13 @@ namespace LazyList {
      * The group common value is contained in the {@link key} property.
      * The group is a {@link LazyAbstractList} itself
      */
-    export class Grouping<TKey, T> extends LazyFixedList<T, T> {
+    export class Grouping<T, TKey> extends LazyFixedList<T, T> {
         constructor(public key: TKey, source: Iterable<T>) { super(source); }
     }
 
     /** Output of {@link groupBy} */
-    export class LazyGroupByList<TKey, T> extends LazySourceList<T, Grouping<TKey, T>> {
-        constructor(source: Iterable<T>, public f: Convert<T, TKey, LazyGroupByList<TKey, T>>) { super(source); }
+    export class LazyGroupByList<T, TKey> extends LazySourceList<T, Grouping<T, TKey>> {
+        constructor(source: Iterable<T>, public f: Convert<T, TKey, LazyGroupByList<T, TKey>>) { super(source); }
 
         *[Symbol.iterator]() {
             var i = 0;
@@ -1252,13 +1457,13 @@ namespace LazyList {
                     cache.set(k, [ e ]);           
             }
             for (const [ k, v ] of cache)
-                yield new Grouping<TKey, T>(k, v);
+                yield new Grouping<T, TKey>(k, v);
         }
     }
 
     /** Output of {@link split} */
     export class LazySplitList<T> extends LazySourceList<T, LazyAbstractList<T>> {
-        constructor(source: Iterable<T>, public n: number, public mode: JoinMode | boolean = false, public lazy: boolean = false, public def: T = undefined) { super(source); }
+        constructor(source: Iterable<T>, public n: number, public mode: JoinMode | boolean = false, public lazy: boolean = false, public def?: T) { super(source); }
 
         *[Symbol.iterator]() {
             const iter: MarkedIterator<T> = this.source[Symbol.iterator]();
@@ -1276,6 +1481,19 @@ namespace LazyList {
         }
     }
 
+    /** Output of {@link wrap} */
+    export class LazyWrapList<T, TList extends Iterable<T>> extends LazySourceList<T, TList> {
+        constructor(source: TList) { super(source); }
+
+        *[Symbol.iterator]() {
+            yield this.source;
+        }
+
+        get fastCount() {
+            return 1;
+        }
+    }
+
     /** Common functionalities of cached lists */
     export abstract class LazyAbstractCacheList<I, O, TCache extends Iterable<O>> extends LazySourceList<I, O> {
         #iter: Iterator<I>;
@@ -1286,16 +1504,16 @@ namespace LazyList {
             yield* this.calcRest();
         }
 
-        /** Calculates the remaining elements one at a time */
-        *calcRest(): Generator<O> {
-            for (var value: I; !({ value, done: this.done } = this.iter.next()).done; )
-                yield this.save(value);
-        }
-
         has(value?: O) {
             if (!arguments.length)
                 return this.done ? this.saved > 0 : super.has();
             return super.has(value);
+        }
+
+        /** Calculates the remaining elements one at a time */
+        *calcRest(): Generator<O> {
+            for (var value: I; !({ value, done: this.done } = this.iter.next()).done; )
+                yield this.save(value);
         }
 
         /** Completes the cache and returns it */
@@ -1343,14 +1561,18 @@ namespace LazyList {
             return false;
         }
     
-        add(value: T) {
-            this.save(value);
-            return this;
-        }
-    
         save(value: T) {
             this.cached.add(value);
             return value;
+        }
+
+        /**
+         * Adds a value to the set
+         * @param value The value to add
+         */
+        add(value: T) {
+            this.save(value);
+            return this;
         }
     
         get saved() {
@@ -1364,6 +1586,18 @@ namespace LazyList {
         cached: Map<K, V> = new Map();
         constructor (source: Iterable<T>, public getK: Convert<T, K, LazyMap<T, K, V>>, public getV?: Convert<T, V, LazyMap<T, K, V>>) { super(source); }
     
+        save(value: T) {
+            const k = this.getK(value, this.processed, this);
+            const v = this.getV ? this.getV(value, this.processed, this) : <any>value;
+            this.cached.set(k, v);
+            this.processed++;
+            return <[ K, V ]>[ k, v ];
+        }
+
+        /**
+         * Gets if the map contains the given key
+         * @param value The key to check
+         */
         hasKey(value: K) {
             if (this.cached.has(value))
                 return true;
@@ -1374,8 +1608,13 @@ namespace LazyList {
     
             return false;
         }
-    
-        get(key: K) {
+
+        /**
+         * Gets the value for the given key
+         * @param key The key to get the value for
+         * @param def The default value to return if the key is not found
+         */
+        get(key: K, def?: V) {
             if (this.cached.has(key))
                 return this.cached.get(key);
     
@@ -1383,20 +1622,17 @@ namespace LazyList {
                 if (k === key)
                     return v;
     
-            return undefined;
+            return def;
         }
     
+        /**
+         * Adds a new key-value pair to the map
+         * @param key The key to add
+         * @param value The value to add
+         */
         set(key: K, value: V) {
             this.cached.set(key, value);
             return this;
-        }
-    
-        save(value: T) {
-            const k = this.getK(value, this.processed, this);
-            const v = this.getV ? this.getV(value, this.processed, this) : <any>value;
-            this.cached.set(k, v);
-            this.processed++;
-            return <[ K, V ]>[ k, v ];
         }
     
         get saved() {
@@ -1408,22 +1644,35 @@ namespace LazyList {
     export class LazyCacheList<T> extends LazyAbstractCacheList<T, T, T[]> {
         cached: T[] = [];
 
-        at(n: number, def: T = null) {
+        at(n: number, def?: T) {
             return n < 0
                 ? this.done
-                    ? this.at(this.cached.length + n, def)
+                    ? this.at(this.saved + n, def)
                     : super.at(n, def)
-                : n < this.cached.length
+                : n < this.saved
                     ? this.cached[n]
                 : this.done
                     ? def
                     : super.at(n, def);
         }
 
-        last(def: T = null) {
+        last(def?: T) {
             return this.done
                 ? this.cached[this.cached.length - 1]
                 : super.last(def);
+        }
+
+        inBound(n: number) {
+            if (n < 0)
+                return this.done
+                    ? (this.saved + n) >= 0
+                    : super.inBound(n);
+            if (n < this.saved)
+                return true;
+            for (const _ of this.calcRest())
+                if (n < this.saved)
+                    return true;
+            return false;
         }
 
         save(value: T) {
