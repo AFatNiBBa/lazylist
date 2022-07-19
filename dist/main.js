@@ -19,7 +19,7 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
 function LazyList(source, force = false) {
     return !force && source instanceof LazyList.LazyAbstractList
         ? source
-        : new LazyList.LazyFixedList(typeof source[Symbol.iterator] === 'function' // If the source is iterable
+        : new LazyList.LazyFixedList(!source || typeof source[Symbol.iterator] === 'function' // If the source is iterable or nullish
             ? source // Wrap it directly
             : { [Symbol.iterator]: () => source }); // Otherwise try to use it as an iterator
 }
