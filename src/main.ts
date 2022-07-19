@@ -10,7 +10,7 @@
     return !force && source instanceof LazyList.LazyAbstractList
         ? <any>source
         : new LazyList.LazyFixedList(
-            typeof source[Symbol.iterator] === 'function'               // If the source is iterable
+            !source || typeof source[Symbol.iterator] === 'function'    // If the source is iterable or nullish
                 ? <Iterable<T>>source                                   // Wrap it directly
                 : { [Symbol.iterator]: () => <Iterator<T>>source });    // Otherwise try to use it as an iterator
 }
