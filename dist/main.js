@@ -11,6 +11,7 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
 };
 /**
  * Returns a {@link LazyList.LazyAbstractList} based on an iterable or an non-iterable iterator.
+ * If the {@link source} is a function, it gets wrapped in a new object that has {@link source} as its {@link Symbol.iterator} method.
  * If the {@link source} is a non-iterable iterator, it gets wrapped in a new object that returns {@link source} in its {@link Symbol.iterator} method.
  * If {@link source} is already a {@link LazyList.LazyAbstractList}, it gets returned directly, otherwise it gets wrapped in a {@link LazyList.LazyFixedList}
  * @param source The iterable/iterator
@@ -21,7 +22,11 @@ function LazyList(source, force = false) {
         ? source
         : new LazyList.LazyFixedList(!source || typeof source[Symbol.iterator] === 'function' // If the source is iterable or nullish
             ? source // Wrap it directly
-            : { [Symbol.iterator]: () => source }); // Otherwise try to use it as an iterator
+            : {
+                [Symbol.iterator]: typeof source === "function" // Else if the source is a function
+                    ? source // Use it as a generator function
+                    : () => source // Otherwise try to use it as an iterator
+            });
 }
 (function (LazyList) {
     var _BufferIterator_currentIndex, _BufferIterator_current, _LazyStore_iter, _LazyAbstractCacheList_iter;
@@ -159,6 +164,10 @@ function LazyList(source, force = false) {
         selectMany(f) {
             return new LazySelectManyList(this, f);
         }
+        /** Flattens in a single list every iterable element of the list, and the elements of the elements and so on */
+        flat() {
+            return new LazyFlatList(this);
+        }
         /**
          * Merges the current list to {@link other}
          * @param other An iterable
@@ -213,13 +222,24 @@ function LazyList(source, force = false) {
             return new LazyShuffleList(this);
         }
         /**
-         * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} since it would be wrong).
+         * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link comp} since it would be wrong).
          * Non lazy
-         * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
+         * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
          * @param desc If `true`, reverses the results
          */
-        sort(f, desc) {
-            return new LazySortList(this, f, desc);
+        sort(comp, desc) {
+            return new LazySortList(this, comp, desc);
+        }
+        /**
+         * Orders the list based on the return value of {@link f}; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} and {@link comp} since it would be wrong).
+         * Differs from {@link sort} in that {@link comp} is provided with the return value of {@link f}, and not the element itself.
+         * Non lazy
+         * @param f A conversion function
+         * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
+         * @param desc If `true`, reverses the results
+         */
+        orderBy(f, desc, comp = LazySortList.defaultComparer) {
+            return new LazySortList(this, (a, b, i, list) => comp(f(a, i, list), f(b, i, list), i, list), desc);
         }
         /**
          * Replaces a section of the list with a new one based on {@link f}, which will be provided with the original section
@@ -934,6 +954,21 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.LazySelectManyList = LazySelectManyList;
+    /** Output of {@link LazyAbstractList.flat} */
+    class LazyFlatList extends LazySourceList {
+        constructor(source) { super(source); }
+        static *flat(source) {
+            for (const elm of source)
+                if (typeof elm[Symbol.iterator] === "function")
+                    yield* LazyFlatList.flat(elm);
+                else
+                    yield elm;
+        }
+        [Symbol.iterator]() {
+            return LazyFlatList.flat(this.source);
+        }
+    }
+    LazyList.LazyFlatList = LazyFlatList;
     /** Output of {@link merge} */
     class LazyMergeList extends LazySourceList {
         constructor(source, other, flip = false) {
@@ -1023,28 +1058,41 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.LazyShuffleList = LazyShuffleList;
-    /** Output of {@link sort} */
+    /** Output of {@link sort} and {@link orderBy} */
     class LazySortList extends LazyFixedList {
-        constructor(source, f, desc = false) {
+        constructor(source, f = LazySortList.defaultComparer, desc = false) {
             super(source);
             this.f = f;
             this.desc = desc;
         }
         *[Symbol.iterator]() {
             const map = new Map();
-            for (const elm of this.source)
+            for (const elm of this.root)
                 map.set(elm, (map.get(elm) ?? 0) + 1);
             while (map.size) {
                 var out, n = 0;
                 for (const elm of map)
-                    if (!n || (this.f ? this.f(elm[0], out, -1, this) < 0 : elm[0] < out) !== this.desc)
+                    if (!n || this.compare(elm[0], out) < 0)
                         [out, n] = elm;
                 for (var i = 0; i < n; i++)
                     yield out;
                 map.delete(out);
             }
         }
+        /** A sorting function that allows two sorts in a row to be combined */
+        compare(a, b) {
+            return this.multiplier * this.f(a, b, -1, this) || this.source instanceof LazySortList && this.source.compare(a, b);
+        }
+        /** Obtains the {@link source} of the first sort of the current chain */
+        get root() {
+            return this.source instanceof LazySortList ? this.source.root : this.source;
+        }
+        /** Gets the number to which the result of {@link f} should be multiplied to be inverted when {@link desc} is true */
+        get multiplier() {
+            return this.desc ? -1 : 1;
+        }
     }
+    LazySortList.defaultComparer = (a, b) => a < b ? -1 : a > b ? 1 : 0;
     LazyList.LazySortList = LazySortList;
     /** Output of {@link splice} */
     class LazySpliceList extends LazySourceList {

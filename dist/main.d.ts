@@ -1,11 +1,14 @@
+/** Returns the type of the elements of {@link T} and continues to do so to the output until the type of the element is not iterable */
+declare type RootElementType<T> = T extends Iterable<infer U> ? RootElementType<U> : T;
 /**
  * Returns a {@link LazyList.LazyAbstractList} based on an iterable or an non-iterable iterator.
+ * If the {@link source} is a function, it gets wrapped in a new object that has {@link source} as its {@link Symbol.iterator} method.
  * If the {@link source} is a non-iterable iterator, it gets wrapped in a new object that returns {@link source} in its {@link Symbol.iterator} method.
  * If {@link source} is already a {@link LazyList.LazyAbstractList}, it gets returned directly, otherwise it gets wrapped in a {@link LazyList.LazyFixedList}
  * @param source The iterable/iterator
  * @param force If `true`, {@link source} is always wrapped
  */
-declare function LazyList<T = any>(source?: Iterable<T> | Iterator<T>, force?: boolean): LazyList.LazyAbstractList<T>;
+declare function LazyList<T = any>(source?: Iterable<T> | Iterator<T> | (() => Iterator<T>), force?: boolean): LazyList.LazyAbstractList<T>;
 declare namespace LazyList {
     const from: typeof LazyList;
     /** Represents data structure with a numeric indexer and a length that do not need to be writable */
@@ -124,6 +127,8 @@ declare namespace LazyList {
          * @param f A conversion function; Can be omitted if every element is iterable
          */
         selectMany<TResult = T extends Iterable<infer U> ? U : never>(f?: Convert<T, Iterable<TResult>, LazySelectManyList<T, TResult>>): LazySelectManyList<T, TResult>;
+        /** Flattens in a single list every iterable element of the list, and the elements of the elements and so on */
+        flat(): LazyFlatList<T>;
         /**
          * Merges the current list to {@link other}
          * @param other An iterable
@@ -164,12 +169,21 @@ declare namespace LazyList {
          */
         shuffle(): LazyShuffleList<T>;
         /**
-         * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} since it would be wrong).
+         * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link comp} since it would be wrong).
          * Non lazy
-         * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
+         * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
          * @param desc If `true`, reverses the results
          */
-        sort(f?: Combine<T, T, number, LazySortList<T>>, desc?: boolean): LazySortList<T>;
+        sort(comp?: Combine<T, T, number, LazySortList<T>>, desc?: boolean): LazySortList<T>;
+        /**
+         * Orders the list based on the return value of {@link f}; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} and {@link comp} since it would be wrong).
+         * Differs from {@link sort} in that {@link comp} is provided with the return value of {@link f}, and not the element itself.
+         * Non lazy
+         * @param f A conversion function
+         * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
+         * @param desc If `true`, reverses the results
+         */
+        orderBy<TKey>(f: Convert<T, TKey, LazySortList<T>>, desc?: boolean, comp?: Combine<TKey, TKey, number, LazySortList<T>>): LazySortList<T>;
         /**
          * Replaces a section of the list with a new one based on {@link f}, which will be provided with the original section
          * @param start The start index of the section
@@ -580,6 +594,12 @@ declare namespace LazyList {
         constructor(source: Iterable<I>, f?: Convert<I, Iterable<O>, LazySelectManyList<I, O>>);
         [Symbol.iterator](): Generator<any, void, any>;
     }
+    /** Output of {@link LazyAbstractList.flat} */
+    class LazyFlatList<T> extends LazySourceList<T, RootElementType<T>> {
+        constructor(source: Iterable<T>);
+        static flat(source: Iterable<any>): any;
+        [Symbol.iterator](): any;
+    }
     /** Output of {@link merge} */
     class LazyMergeList<T> extends LazySourceList<T, T> {
         other: Iterable<T>;
@@ -616,12 +636,19 @@ declare namespace LazyList {
     class LazyShuffleList<T> extends LazyFixedList<T, T> {
         [Symbol.iterator](): Generator<T, void, unknown>;
     }
-    /** Output of {@link sort} */
+    /** Output of {@link sort} and {@link orderBy} */
     class LazySortList<T> extends LazyFixedList<T, T> {
-        f?: Combine<T, T, number, LazySortList<T>>;
+        f: Combine<T, T, number, LazySortList<T>>;
         desc: boolean;
+        static defaultComparer: <T_1>(a: T_1, b: T_1) => 1 | -1 | 0;
         constructor(source: Iterable<T>, f?: Combine<T, T, number, LazySortList<T>>, desc?: boolean);
         [Symbol.iterator](): Generator<T, void, unknown>;
+        /** A sorting function that allows two sorts in a row to be combined */
+        compare(a: T, b: T): any;
+        /** Obtains the {@link source} of the first sort of the current chain */
+        get root(): any;
+        /** Gets the number to which the result of {@link f} should be multiplied to be inverted when {@link desc} is true */
+        get multiplier(): 1 | -1;
     }
     /** Output of {@link splice} */
     class LazySpliceList<T> extends LazySourceList<T, T> {
