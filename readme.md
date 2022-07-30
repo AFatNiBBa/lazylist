@@ -72,6 +72,7 @@ Methods that generate other `LazyList`s:
 - **`selectWhere`**: Converts and filters the list based on a provided function at the same time
 - **`select`**: Converts the list based on a provided function
 - **`selectMany`**: Concats the (iterable) outputs of a provided function that will be applied to each element of the list
+- **`flat`**: Flattens in a single list every iterable element of the list, and the elements of the elements and so on
 - **`merge`**: Concats the current list to an iterable
 - **`append`**: Adds a value to the end of the current list
 - **`prepend`**: Adds a value to the beginning of the current list
@@ -79,7 +80,8 @@ Methods that generate other `LazyList`s:
 - **`repeat`**: Repeat the list's elements `n` times
 - (non lazy) **`reverse`**: Reverses the list
 - (non lazy) **`shuffle`**: Shuffles the list in a randomic way
-- (non lazy) **`sort`**: Sorts the list based on a provided function
+- (non lazy) **`sort`**: Sorts the list based on a provided comparer
+- (non lazy) **`orderBy`**: Sorts the list based on a provided function and a comparer
 - **`splice`**: Replaces a section of the list with a new one based on a provided function
 **`fixedCount`**: Throws a `RangeError` if the current list has not exactly `n` elements
 - (non lazy?) **`skip`**: Skips the first `n` elements of the list (If `n` is negative, it skips from the end but is not lazy)
