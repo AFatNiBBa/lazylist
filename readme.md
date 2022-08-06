@@ -35,10 +35,9 @@ For the details look at the JSDocs.
 
 ### **Aggregate**
 - **`at`**: Returns the element at the provided index
-- **`last`**: Gets the last element of the list or the provided value as default if it's empty
-- **`first`**: Gets the first element of the list or the provided value as default if it's empty
-- **`single`**: Gets the first element of the current list if it has exactly `1` element, otherwise the provided value as default, unless none is passed, in that case it throws a `RangeError`
+- **`single`**: Gets the first element of the current list if it has exactly `1` element, otherwise throws a `RangeError` according to the provided error mode
 - **`aggregate`**: Aggregates the current list based on a provided function
+- **`allEquals`**: Returns `true` if every element is equal to every other
 - **`all`**: Returns `true` if the provided predicate returns `true` for every element of the list
 - **`any`**: Returns `true` if the provided predicate returns `true` for at least one element of the list
 - **`inBound`**: Returns `true` if the element at the given index can be retrieved
@@ -48,6 +47,8 @@ For the details look at the JSDocs.
 - **`concat`**: Joins the list elements using the given separator
 - **`min`**: Returns the smallest number in the list based on a provided function
 - **`max`**: Returns the biggest number in the list based on a provided function
+- (getter) **`first`**: Gets the first element of the list
+- (getter) **`last`**: Gets the last element of the list
 - (getter) **`sum`**: Aggregates the list using the `+` operator (Can both add numbers and concatenate strings)
 - (getter) **`avg`**: Calculates the average of the elements of the list
 - (getter) **`count`**: Calculates the length of the list
@@ -61,6 +62,7 @@ Classes without methods:
 Methods that generate other `LazyList`s:
 - (static & hack) **`injectInto`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
 - (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
+- (static) **`toGenerator`**: Makes the provided iterator iterable
 - (static) **`rand`**: Returns an INFINITE sequence of random numbers comprised between the provided boundaries
 - (static) **`range`**: Creates a new list that will iterate through the specified boundaries
 - (static) **`from`**: Returns a new `LazyFixedList` that wraps the provided iterable object, unless the object is a `LazyList` itself, in that case it gets returned directly
@@ -76,14 +78,15 @@ Methods that generate other `LazyList`s:
 - **`merge`**: Concats the current list to an iterable
 - **`append`**: Adds a value to the end of the current list
 - **`prepend`**: Adds a value to the beginning of the current list
-- **`defaultIfEmpty`**: Adds a value to the end of the current list if it is empty
+- **`default`**: Adds a value to the end of the current list if it is empty
 - **`repeat`**: Repeat the list's elements `n` times
 - (non lazy) **`reverse`**: Reverses the list
 - (non lazy) **`shuffle`**: Shuffles the list in a randomic way
 - (non lazy) **`sort`**: Sorts the list based on a provided comparer
 - (non lazy) **`orderBy`**: Sorts the list based on a provided function and a comparer
 - **`splice`**: Replaces a section of the list with a new one based on a provided function
-**`fixedCount`**: Throws a `RangeError` if the current list has not exactly `n` elements
+- **`fixedCount`**: Throws a `RangeError` according to the provided error mode if the current list has not exactly `n` elements
+- (non lazy?) **`rotate`**: Moves the first `n` elements to the end of the list (If `n` is negative, it rotates towards the end but is not lazy)
 - (non lazy?) **`skip`**: Skips the first `n` elements of the list (If `n` is negative, it skips from the end but is not lazy)
 - (non lazy?) **`take`**: Takes only the first `n` elements of the list (If `n` is negative, it takes from the end but is not lazy)
 - (non lazy) **`padStart`**: Force the list to have at least `n` elements by concatenating as many default values (Provided by input) as needed at the beginning of the list
@@ -93,7 +96,7 @@ Methods that generate other `LazyList`s:
 - **`combinations`**: Generates all the possible combinations of the provided length of the elements of the list
 - **`storeBy`**: Lazy version of `groupBy`, the groups cannot be iterated, only their element can
 - (non lazy) **`groupBy`**: Groups the list's elements based on a provided function
-- (non lazy | unsafe) **`split`**: Groups the list's elements, `n` at a time; Passing `true` as the `lazy` argument will make the list lazy but unsafe
+- (non lazy | unsafe) **`split`**: Groups the list's elements, `n` at a time or splits it according to a predicate; Passing `true` as the `lazy` argument will make the list lazy but unsafe
 - **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
 - **`toSet`**: Returns a set that contains the elements of the current list
 - **`toMap`**: Returns a map that contains the elements of the current list
@@ -104,8 +107,9 @@ Methods that generate other `LazyList`s:
 - **`catch`**: Applies a "catch" function to each element of the current list (whose elements should be promises)
 - **`ofType`**: Filters the list returning only the elements which are instances of the given constructor
 - **`assign`**: Executes `Object.assign()` on each element passing the given object as the second parameter
-- **`but`**: Executes `f` on each element of the list and returns the current element (not the output of `f`)
+- **`but`**: Executes `f` on each element of the list and returns the current element (Not the output of `f`)
 - **`forEach`**: Executes `f` on each element of the list forcing it to be entirely calculated 
+- **`fill`**: Replaces every element of the list with the provided value
 - **`slice`**: Returns a section of the current list
 
 ## Generators as lazy lists

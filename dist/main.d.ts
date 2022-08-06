@@ -52,6 +52,12 @@ declare namespace LazyList {
      */
     function fastCount(source: Iterable<any>): number;
     /**
+     * Makes the provided iterator iterable.
+     * If a generator is used in a foreach loop and you break out of it, the generator will be closed (It will stop even if some elements remain), this function prevents that.
+     * @param iter The iterator to make iterable
+     */
+    function toGenerator<T>(iter: Iterator<T>): Generator<T, void, unknown>;
+    /**
      * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
      * Since the sequence is infinite, it will create problems with non lazy methods.
      * Since the sequence is random, it will not be the same every time you calculate it
@@ -150,7 +156,7 @@ declare namespace LazyList {
          * Forces the list to have at least one element by adding a default value if the list is empty
          * @param def The value to add if the list is empty
          */
-        defaultIfEmpty(def?: T): LazyDefaultIfEmptyList<T>;
+        default(def?: T): LazyDefaultList<T>;
         /**
          * Repeat the list's elements {@link n} times.
          * The list is calculated each time.
@@ -193,11 +199,18 @@ declare namespace LazyList {
          */
         splice(start: number, length?: number, f?: (x: LazyFixedList<T, T>) => Iterable<T>, lazy?: boolean): LazySpliceList<T>;
         /**
-         * Throws a {@link RangeError} if the list has not exactly {@link n} elements.
+         * Throws a {@link RangeError} based on {@link mode}, generally if the list has not exactly {@link n} elements.
          * Notice that if the iteration its stopped before the end the input list could have more than {@link n} elements
          * @param n The number of elements the list must have
+         * @param mode Tells the method when to throw errors
+         * @param def The default value to return if the list has less than {@link n} elements and {@link mode} is {@link JoinMode.inner} or {@link JoinMode.left}
          */
-        fixedCount(n: number): LazyFixedCountList<T>;
+        fixedCount(n: number, mode?: JoinMode, def?: T): LazyFixedCountList<T>;
+        /**
+         * Moves the first {@link p} elements to the end of the list
+         * @param p The elements to rotate (Use a negative number to skip from the end); If a function is given, it will be called for each element and the elements will be skipped until the function returns `false`
+         */
+        rotate(p: Predicate<T, LazySkipList<T>> | number): LazyRotateList<T>;
         /**
          * Skips the first {@link p} elements of the list
          * @param p The elements to skip (Use a negative number to skip from the end); If a function is given, it will be called for each element and the elements will be skipped until the function returns `false`
@@ -278,12 +291,12 @@ declare namespace LazyList {
          * LazyList.from([ 1, 2, 3 ]).split(2, false, true).value; // Stops
          * ```
          * Additionally a lot of unexpected behaviours could occur
-         * @param n The length of each slice
+         * @param p The length of each slice or a predicate that tells if the list should be split by this value, which will be omitted
          * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many {@link def} as needed
          * @param lazy Indicates if the list should be lazy (and unsafe)
          * @param def The value to use if the list is too short
          */
-        split(n: number, mode?: JoinMode | boolean, lazy?: boolean, def?: T): LazySplitList<T>;
+        split(p: Predicate<T, LazySplitList<T>> | number, lazy?: boolean, mode?: JoinMode | boolean, def?: T): any;
         /** Outputs an iterable that will contain the current one as its only element */
         wrap(): LazyWrapList<T, this>;
         /**
@@ -340,6 +353,8 @@ declare namespace LazyList {
          * @param f A function
          */
         forEach(f?: Convert<T, void, LazyAbstractList<T>>): void;
+        /** Replaces every element of the list with {@link value} */
+        fill(value: T): LazySelectList<T, T>;
         /**
          * Returns a section of the list, starting at {@link start} and with {@link length} elements
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
@@ -354,27 +369,23 @@ declare namespace LazyList {
          */
         at(n: number, def?: T): T;
         /**
-         * Gets the last element of the list or {@link def} as default if it's empty
-         * @param def The default value
+         * Throws a {@link RangeError} based on {@link mode}, generally if the list has not exactly `1` element
+         * @param mode Tells the method when to throw errors
+         * @param def The default value to return if the list has less than `1` elements and {@link mode} is {@link JoinMode.inner} or {@link JoinMode.left}
          */
-        last(def?: T): T;
-        /**
-         * Gets the first element of the list or {@link def} as default if it's empty.
-         * Can be used as `next()` when the source iterable is a generator
-         * @param def The default value
-         */
-        first(def?: T): T;
-        /**
-         * Gets the first element of the list if it has exactly `1` element, otherwise the provided value as default, unless none is passed, in that case it throws a `RangeError`
-         * @param def The default value; If provided, it will be returned instead of throwing an error
-         */
-        single(def?: T): T;
+        single(mode?: JoinMode, def?: T): T;
         /**
          * Aggregates the list based on {@link f}
          * @param f A combination function
          * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration)
          */
         aggregate<TResult = T>(f: Combine<TResult, T, TResult, LazyAbstractList<T>>, out?: TResult): TResult;
+        /**
+         * Returns `false` if there is an element that is not equal to the first.
+         * If the list is empty, it returns `true`
+         * @param f A comparison function
+         */
+        allEquals(f?: Combine<T, T, boolean, LazyAbstractList<T>>): boolean;
         /**
          * Returns `true` if {@link f} returns `true` for every element of the list
          * @param f A predicate function; It defaults to the identity function
@@ -421,6 +432,13 @@ declare namespace LazyList {
          * @param f A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
          */
         max(f?: Combine<T, T, number, LazyAbstractList<T>>): T;
+        /**
+         * Gets the first element of the list or {@link def} as default if it's empty.
+         * Can be used as `next()` when the source iterable is a generator
+         */
+        get first(): T;
+        /** Gets the last element of the list or `undefined` as default if it's empty */
+        get last(): T;
         /** Aggregates the list using the `+` operator (Can both add numbers and concatenate strings) */
         get sum(): T extends number ? number : string;
         /** Calculates the average of the elements of the list */
@@ -615,11 +633,12 @@ declare namespace LazyList {
         [Symbol.iterator](): Generator<T, void, undefined>;
         get fastCount(): number;
     }
-    /** Output of {@link defaultIfEmpty} */
-    class LazyDefaultIfEmptyList<T> extends LazyFixedList<T, T> {
+    /** Output of {@link default} */
+    class LazyDefaultList<T> extends LazyFixedList<T, T> {
         def?: T;
         constructor(source: Iterable<T>, def?: T);
-        [Symbol.iterator](): Generator<T, void, unknown>;
+        [Symbol.iterator](): Generator<T, any, unknown>;
+        get fastCount(): number;
     }
     /** Output of {@link repeat} */
     class LazyRepeatList<T> extends LazyFixedList<T, T> {
@@ -662,25 +681,37 @@ declare namespace LazyList {
     /** Output of {@link LazyAbstractList.fixedCount} */
     class LazyFixedCountList<T> extends LazySourceList<T, T> {
         n: number;
-        constructor(source: Iterable<T>, n: number);
+        mode: JoinMode;
+        def?: T;
+        constructor(source: Iterable<T>, n: number, mode?: JoinMode, def?: T);
         [Symbol.iterator](): Generator<T, void, unknown>;
         get fastCount(): number;
     }
+    /** Output of {@link LazyAbstractList.rotate} */
+    class LazyRotateList<T> extends LazyFixedList<T, T> {
+        p: Predicate<T, LazySkipList<T>> | number;
+        constructor(source: Iterable<T>, p: Predicate<T, LazySkipList<T>> | number);
+        static rotate<T>(iter: MarkedIterator<T>, n: number): any;
+        [Symbol.iterator](): Generator<any, any, any>;
+    }
     /** Output of {@link LazyAbstractList.skip} */
-    class LazySkipList<T> extends LazySourceList<T, T> {
+    class LazySkipList<T> extends LazyFixedList<T, T> {
         p: Predicate<T, LazySkipList<T>> | number;
         constructor(source: Iterable<T>, p: Predicate<T, LazySkipList<T>> | number);
         static skip<T>(iter: MarkedIterator<T>, n: number): Generator<T, void, unknown>;
         [Symbol.iterator](): Generator<T, void, unknown>;
+        get fastCount(): number;
     }
     /** Output of {@link LazyAbstractList.take} */
-    class LazyTakeList<T> extends LazySourceList<T, T> {
+    class LazyTakeList<T> extends LazyFixedList<T, T> {
         p: Predicate<T, LazyTakeList<T>> | number;
         mode: JoinMode | boolean;
         def?: T;
         constructor(source: Iterable<T>, p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T);
         static take<T>(iter: MarkedIterator<T>, n: number, mode?: JoinMode | boolean, def?: T): Generator<T, void, unknown>;
+        static takeWhile<T, TList>(iter: MarkedIterator<T>, p: Predicate<T, TList>, list?: TList): Generator<T, void, unknown>;
         [Symbol.iterator](): Generator<T, void, unknown>;
+        get fastCount(): number;
     }
     /** Output of {@link padStart} */
     class LazyPadStartList<T> extends LazySourceList<T, T> {
@@ -772,11 +803,11 @@ declare namespace LazyList {
     }
     /** Output of {@link split} */
     class LazySplitList<T> extends LazySourceList<T, LazyAbstractList<T>> {
-        n: number;
-        mode: JoinMode | boolean;
+        p: Predicate<T, LazySplitList<T>> | number;
         lazy: boolean;
+        mode: JoinMode | boolean;
         def?: T;
-        constructor(source: Iterable<T>, n: number, mode?: JoinMode | boolean, lazy?: boolean, def?: T);
+        constructor(source: Iterable<T>, p: Predicate<T, LazySplitList<T>> | number, lazy?: boolean, mode?: JoinMode | boolean, def?: T);
         [Symbol.iterator](): Generator<LazyFixedList<T, T>, void, unknown>;
     }
     /** Output of {@link wrap} */
@@ -848,9 +879,9 @@ declare namespace LazyList {
     class LazyCacheList<T> extends LazyAbstractCacheList<T, T, T[]> {
         cached: T[];
         at(n: number, def?: T): any;
-        last(def?: T): T;
         inBound(n: number): boolean;
         save(value: T): T;
+        get last(): T;
         get fastCount(): number;
         get saved(): number;
     }

@@ -22,11 +22,10 @@ function LazyList(source, force = false) {
         ? source
         : new LazyList.LazyFixedList(!source || typeof source[Symbol.iterator] === 'function' // If the source is iterable or nullish
             ? source // Wrap it directly
-            : {
-                [Symbol.iterator]: typeof source === "function" // Else if the source is a function
-                    ? source // Use it as a generator function
-                    : () => source // Otherwise try to use it as an iterator
-            });
+            : typeof source === "function" // Else if the source is a function
+                ? { [Symbol.iterator]: source } // Use it as a generator function
+                : LazyList.toGenerator(source) // Otherwise try to use it as an iterator
+        );
 }
 (function (LazyList) {
     var _BufferIterator_currentIndex, _BufferIterator_current, _LazyStore_iter, _LazyAbstractCacheList_iter;
@@ -70,6 +69,16 @@ function LazyList(source, force = false) {
                         : -1;
     }
     LazyList.fastCount = fastCount;
+    /**
+     * Makes the provided iterator iterable.
+     * If a generator is used in a foreach loop and you break out of it, the generator will be closed (It will stop even if some elements remain), this function prevents that.
+     * @param iter The iterator to make iterable
+     */
+    function* toGenerator(iter) {
+        for (var value; !({ value } = iter.next()).done;)
+            yield value;
+    }
+    LazyList.toGenerator = toGenerator;
     /**
      * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
      * Since the sequence is infinite, it will create problems with non lazy methods.
@@ -195,8 +204,8 @@ function LazyList(source, force = false) {
          * Forces the list to have at least one element by adding a default value if the list is empty
          * @param def The value to add if the list is empty
          */
-        defaultIfEmpty(def) {
-            return new LazyDefaultIfEmptyList(this, def);
+        default(def) {
+            return new LazyDefaultList(this, def);
         }
         /**
          * Repeat the list's elements {@link n} times.
@@ -252,12 +261,21 @@ function LazyList(source, force = false) {
             return new LazySpliceList(this, start, length, f, lazy);
         }
         /**
-         * Throws a {@link RangeError} if the list has not exactly {@link n} elements.
+         * Throws a {@link RangeError} based on {@link mode}, generally if the list has not exactly {@link n} elements.
          * Notice that if the iteration its stopped before the end the input list could have more than {@link n} elements
          * @param n The number of elements the list must have
+         * @param mode Tells the method when to throw errors
+         * @param def The default value to return if the list has less than {@link n} elements and {@link mode} is {@link JoinMode.inner} or {@link JoinMode.left}
          */
-        fixedCount(n) {
-            return new LazyFixedCountList(this, n);
+        fixedCount(n, mode, def) {
+            return new LazyFixedCountList(this, n, mode, def);
+        }
+        /**
+         * Moves the first {@link p} elements to the end of the list
+         * @param p The elements to rotate (Use a negative number to skip from the end); If a function is given, it will be called for each element and the elements will be skipped until the function returns `false`
+         */
+        rotate(p) {
+            return new LazyRotateList(this, p);
         }
         /**
          * Skips the first {@link p} elements of the list
@@ -357,13 +375,13 @@ function LazyList(source, force = false) {
          * LazyList.from([ 1, 2, 3 ]).split(2, false, true).value; // Stops
          * ```
          * Additionally a lot of unexpected behaviours could occur
-         * @param n The length of each slice
+         * @param p The length of each slice or a predicate that tells if the list should be split by this value, which will be omitted
          * @param mode If truthy, every slice will be forced to have {@link n} elements by concatenating as many {@link def} as needed
          * @param lazy Indicates if the list should be lazy (and unsafe)
          * @param def The value to use if the list is too short
          */
-        split(n, mode, lazy, def) {
-            return new LazySplitList(this, n, mode, lazy, def);
+        split(p, lazy, mode, def) {
+            return new LazySplitList(this, p, lazy, mode, def);
         }
         /** Outputs an iterable that will contain the current one as its only element */
         wrap() {
@@ -447,6 +465,10 @@ function LazyList(source, force = false) {
             for (const elm of this)
                 f?.(elm, i, this);
         }
+        /** Replaces every element of the list with {@link value} */
+        fill(value) {
+            return new LazySelectList(this, () => value);
+        }
         /**
          * Returns a section of the list, starting at {@link start} and with {@link length} elements
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
@@ -469,39 +491,18 @@ function LazyList(source, force = false) {
                     return def;
                 return temp[temp.length + n];
             }
-            return this.skip(n).first(def);
+            return this.skip(n).default(def).first;
         }
         /**
-         * Gets the last element of the list or {@link def} as default if it's empty
-         * @param def The default value
+         * Throws a {@link RangeError} based on {@link mode}, generally if the list has not exactly `1` element
+         * @param mode Tells the method when to throw errors
+         * @param def The default value to return if the list has less than `1` elements and {@link mode} is {@link JoinMode.inner} or {@link JoinMode.left}
          */
-        last(def) {
-            for (const elm of this)
-                def = elm;
-            return def;
-        }
-        /**
-         * Gets the first element of the list or {@link def} as default if it's empty.
-         * Can be used as `next()` when the source iterable is a generator
-         * @param def The default value
-         */
-        first(def) {
-            const temp = this[Symbol.iterator]().next();
-            return temp.done
-                ? def
-                : temp.value;
-        }
-        /**
-         * Gets the first element of the list if it has exactly `1` element, otherwise the provided value as default, unless none is passed, in that case it throws a `RangeError`
-         * @param def The default value; If provided, it will be returned instead of throwing an error
-         */
-        single(def) {
-            const temp = this.take(2).value;
-            if (temp.length === 1)
-                return temp[0];
-            if (arguments.length === 0)
-                throw new RangeError("List has not exactly 1 element");
-            return def;
+        single(mode, def) {
+            const iter = this.fixedCount(1, mode, def)[Symbol.iterator]();
+            const out = iter.next().value; // Throws if no element
+            iter.next(); // Throws if more than 1 element
+            return out;
         }
         /**
          * Aggregates the list based on {@link f}
@@ -516,6 +517,20 @@ function LazyList(source, force = false) {
                     : f(out, e, i, this),
                     i++;
             return out;
+        }
+        /**
+         * Returns `false` if there is an element that is not equal to the first.
+         * If the list is empty, it returns `true`
+         * @param f A comparison function
+         */
+        allEquals(f) {
+            var i = 1, first;
+            const iter = this[Symbol.iterator]();
+            if (!({ value: first } = iter.next()).done)
+                for (var value; !({ value } = iter.next()).done;)
+                    if (f ? !f(value, first, i++, this) : value !== first)
+                        return false;
+            return true;
         }
         /**
          * Returns `true` if {@link f} returns `true` for every element of the list
@@ -601,6 +616,20 @@ function LazyList(source, force = false) {
          */
         max(f) {
             return this.aggregate((a, b, i, list) => (f ? f(a, b, i, list) > 0 : a > b) ? a : b);
+        }
+        /**
+         * Gets the first element of the list or {@link def} as default if it's empty.
+         * Can be used as `next()` when the source iterable is a generator
+         */
+        get first() {
+            return this[Symbol.iterator]().next().value;
+        }
+        /** Gets the last element of the list or `undefined` as default if it's empty */
+        get last() {
+            var out;
+            for (const elm of this)
+                out = elm;
+            return out;
         }
         /** Aggregates the list using the `+` operator (Can both add numbers and concatenate strings) */
         get sum() {
@@ -1006,22 +1035,26 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.LazyAppendList = LazyAppendList;
-    /** Output of {@link defaultIfEmpty} */
-    class LazyDefaultIfEmptyList extends LazyFixedList {
+    /** Output of {@link default} */
+    class LazyDefaultList extends LazyFixedList {
         constructor(source, def) {
             super(source);
             this.def = def;
         }
         *[Symbol.iterator]() {
-            var empty = true;
-            for (const elm of this.source)
-                (empty = false),
-                    yield elm;
-            if (empty)
-                yield this.def;
+            var value;
+            const iter = this.source[Symbol.iterator]();
+            if (({ value } = iter.next()).done)
+                return yield this.def;
+            else
+                yield value;
+            yield* toGenerator(iter);
+        }
+        get fastCount() {
+            return super.fastCount || 1;
         }
     }
-    LazyList.LazyDefaultIfEmptyList = LazyDefaultIfEmptyList;
+    LazyList.LazyDefaultList = LazyDefaultList;
     /** Output of {@link repeat} */
     class LazyRepeatList extends LazyFixedList {
         constructor(source, n) {
@@ -1111,34 +1144,72 @@ function LazyList(source, force = false) {
                 yield* this.f(this.lazy ? temp : temp.calc());
             else
                 temp.calc(); // Forces the evaluation if there is no function, otherwise the selected part would not be removed
-            for (var value; !({ value } = iter.next()).done;)
-                yield value;
+            yield* toGenerator(iter);
         }
     }
     LazyList.LazySpliceList = LazySpliceList;
     /** Output of {@link LazyAbstractList.fixedCount} */
     class LazyFixedCountList extends LazySourceList {
-        constructor(source, n) {
+        constructor(source, n, mode = JoinMode.right, def) {
             super(source);
             this.n = n;
+            this.mode = mode;
+            this.def = def;
         }
         *[Symbol.iterator]() {
+            var i = 0;
             const iter = this.source[Symbol.iterator]();
-            for (var value, i = 0; i < this.n; i++)
-                if (({ value } = iter.next()).done)
+            for (const elm of LazyTakeList.take(iter, this.n))
+                yield elm,
+                    i++;
+            if (i < this.n)
+                if (this.mode === JoinMode.right || this.mode === JoinMode.outer)
                     throw new RangeError(`Fixed count list has less than ${this.n} element${this.n - 1 ? 's' : ''}`);
                 else
-                    yield value;
-            if (!iter.next().done)
-                throw new RangeError(`Fixed count list has more than ${this.n} elements${this.n - 1 ? 's' : ''}`);
+                    while (i++ < this.n)
+                        yield this.def;
+            else if ((this.mode === JoinMode.right || this.mode === JoinMode.inner) && !iter.next().done)
+                throw new RangeError(`Fixed count list has more than ${this.n} element${this.n - 1 ? 's' : ''}`);
         }
         get fastCount() {
             return this.n;
         }
     }
     LazyList.LazyFixedCountList = LazyFixedCountList;
+    /** Output of {@link LazyAbstractList.rotate} */
+    class LazyRotateList extends LazyFixedList {
+        constructor(source, p) {
+            super(source);
+            this.p = p;
+        }
+        static *rotate(iter, n) {
+            const temp = [...LazyTakeList.take(iter, n)];
+            if (temp.length < n)
+                return yield* LazyRotateList.rotate(temp[Symbol.iterator](), n % temp.length);
+            yield* toGenerator(iter);
+            yield* temp;
+        }
+        *[Symbol.iterator]() {
+            if (typeof this.p === "number") {
+                const [iter, l] = this.p < 0 ? this.calcLength() : [this.source, 0];
+                return yield* LazyRotateList.rotate(iter[Symbol.iterator](), l + this.p);
+            }
+            var i = 0;
+            const temp = [];
+            const iter = this.source[Symbol.iterator]();
+            for (var value; !({ value } = iter.next()).done;) // Fills the array until the predicate returns `false`
+                if (this.p(value, i++, this))
+                    temp.push(value);
+                else
+                    break;
+            yield value; // Yields the element that returned `false`
+            yield* toGenerator(iter); // Yields the rest of the elements
+            yield* temp; // Yields the first elements
+        }
+    }
+    LazyList.LazyRotateList = LazyRotateList;
     /** Output of {@link LazyAbstractList.skip} */
-    class LazySkipList extends LazySourceList {
+    class LazySkipList extends LazyFixedList {
         constructor(source, p) {
             super(source);
             this.p = p;
@@ -1147,8 +1218,7 @@ function LazyList(source, force = false) {
             for (var i = 0; i < n; i++)
                 if (iter.done = iter.next().done)
                     return;
-            for (var value; !({ value } = iter.next()).done;)
-                yield value;
+            yield* toGenerator(iter);
         }
         *[Symbol.iterator]() {
             if (typeof this.p === "number") {
@@ -1160,15 +1230,23 @@ function LazyList(source, force = false) {
                     yield* LazySkipList.skip(this.source[Symbol.iterator](), this.p);
                 return;
             }
-            let i = 0, done = false;
+            var i = 0, done = false;
             for (const elm of this.source)
                 if (done || (done = !this.p(elm, i++, this)))
                     yield elm;
         }
+        get fastCount() {
+            if (typeof this.p === "function")
+                return -1;
+            const temp = super.fastCount;
+            return ~temp
+                ? Math.max(0, temp - Math.abs(this.p))
+                : -1;
+        }
     }
     LazyList.LazySkipList = LazySkipList;
     /** Output of {@link LazyAbstractList.take} */
-    class LazyTakeList extends LazySourceList {
+    class LazyTakeList extends LazyFixedList {
         constructor(source, p, mode = false, def) {
             super(source);
             this.p = p;
@@ -1185,22 +1263,38 @@ function LazyList(source, force = false) {
                 else
                     yield value;
         }
+        static *takeWhile(iter, p, list) {
+            var i = 0;
+            for (var value; !(iter.done = ({ value } = iter.next()).done);)
+                if (p(value, i++, list))
+                    yield value;
+                else
+                    break;
+        }
         *[Symbol.iterator]() {
             if (typeof this.p === "number") {
                 if (this.p < 0) {
                     const [iter, l] = this.calcLength();
                     yield* LazySkipList.skip(iter[Symbol.iterator](), l + this.p);
+                    if (this.mode)
+                        for (var i = l; i < -this.p; i++)
+                            yield this.def;
                 }
                 else
                     yield* LazyTakeList.take(this.source[Symbol.iterator](), this.p, this.mode, this.def);
-                return;
             }
-            let i = 0;
-            for (const elm of this.source)
-                if (this.p(elm, i++, this))
-                    yield elm;
-                else
-                    break;
+            else
+                yield* LazyTakeList.takeWhile(this.source[Symbol.iterator](), this.p, this);
+        }
+        get fastCount() {
+            if (typeof this.p === "function")
+                return -1;
+            if (this.mode)
+                return Math.abs(this.p);
+            const temp = super.fastCount;
+            return ~temp
+                ? Math.min(Math.abs(this.p), temp)
+                : -1;
         }
     }
     LazyList.LazyTakeList = LazyTakeList;
@@ -1470,20 +1564,24 @@ function LazyList(source, force = false) {
     LazyList.LazyGroupByList = LazyGroupByList;
     /** Output of {@link split} */
     class LazySplitList extends LazySourceList {
-        constructor(source, n, mode = false, lazy = false, def) {
+        constructor(source, p, lazy = false, mode = false, def) {
             super(source);
-            this.n = n;
-            this.mode = mode;
+            this.p = p;
             this.lazy = lazy;
+            this.mode = mode;
             this.def = def;
         }
         *[Symbol.iterator]() {
+            const numeric = typeof this.p === "number";
             const iter = this.source[Symbol.iterator]();
+            const next = numeric
+                ? () => LazyTakeList.take(iter, this.p, this.mode, this.def)
+                : () => LazyTakeList.takeWhile(iter, (x, i) => !this.p(x, i, this));
             while (!iter.done) {
-                const lazy = new LazyFixedList(LazyTakeList.take(iter, this.n, this.mode, this.def)); // This doesn't use the normal `list.take()` because I would have reconverted "iter" into an iterable
+                const lazy = new LazyFixedList(next());
                 if (!this.lazy) {
                     const temp = lazy.calc();
-                    if (temp.has()) // If the list is not lazy, it can be checked for emptyness
+                    if (!numeric || temp.has()) // If the list is not lazy, it can be checked for emptyness
                         yield temp;
                 }
                 else
@@ -1646,11 +1744,6 @@ function LazyList(source, force = false) {
                         ? def
                         : super.at(n, def);
         }
-        last(def) {
-            return this.done
-                ? this.cached[this.cached.length - 1]
-                : super.last(def);
-        }
         inBound(n) {
             if (n < 0)
                 return this.done
@@ -1666,6 +1759,11 @@ function LazyList(source, force = false) {
         save(value) {
             this.cached.push(value);
             return value;
+        }
+        get last() {
+            return this.done
+                ? this.cached[this.cached.length - 1]
+                : super.last;
         }
         get fastCount() {
             return this.done
