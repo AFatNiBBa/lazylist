@@ -599,6 +599,7 @@ function LazyList(source, force = false) {
         /**
          * Given multiple predicate functions it returns an array containing for each function the times it returned `true`
          * @param p The predicate functions
+         * @returns An array with a function to convert it in a {@link LazyAbstractList} ({@link Laziable.prototype.lazy})
          */
         multiCount(...p) {
             var i = 0;
@@ -609,7 +610,7 @@ function LazyList(source, force = false) {
                         out[k]++;
                 i++;
             }
-            return out;
+            return Object.setPrototypeOf(out, Laziable.prototype);
         }
         /**
          * Joins the list elements using {@link sep} as the separator
@@ -1790,6 +1791,14 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.LazyCacheList = LazyCacheList;
+    /** Array that can be converted to a {@link LazyAbstractList} with a convenient method ({@link lazy}) */
+    class Laziable extends Array {
+        /** Converts {@link this} into a {@link LazyAbstractList} */
+        lazy() {
+            return LazyList.from(this);
+        }
+    }
+    LazyList.Laziable = Laziable;
 })(LazyList || (LazyList = {}));
 if (typeof module !== "object")
     var module = {};

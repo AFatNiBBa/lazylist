@@ -10,7 +10,7 @@ type RootElementType<T> = T extends Iterable<infer U> ? RootElementType<U> : T;
  * @param source The iterable/iterator
  * @param force If `true`, {@link source} is always wrapped
  */
- function LazyList<T = any>(source?: Iterable<T> | Iterator<T> | (() => Iterator<T>), force: boolean = false): LazyList.LazyAbstractList<T> {
+ function LazyList<T = any>(source?: LazyList.Source<T>, force: boolean = false): LazyList.LazyAbstractList<T> {
     return !force && source instanceof LazyList.LazyAbstractList
         ? <any>source
         : new LazyList.LazyFixedList(
@@ -24,6 +24,9 @@ type RootElementType<T> = T extends Iterable<infer U> ? RootElementType<U> : T;
 
 namespace LazyList {
     export const from = LazyList;
+
+    /** Represents something which can be converted to a {@link LazyAbstractList} through {@link from} */
+    export type Source<T> = Iterable<T> | Iterator<T> | (() => Iterator<T>);
 
     /** Represents data structure with a numeric indexer and a length that do not need to be writable */
     export type ReadOnlyIndexable<T> = { readonly [k: number]: T, readonly length: number };
@@ -670,6 +673,7 @@ namespace LazyList {
         /**
          * Given multiple predicate functions it returns an array containing for each function the times it returned `true`
          * @param p The predicate functions
+         * @returns An array with a function to convert it in a {@link LazyAbstractList} ({@link Laziable.prototype.lazy})
          */
         multiCount(...p: Predicate<T, LazyAbstractList<T>>[]) {
             var i = 0;
@@ -681,7 +685,7 @@ namespace LazyList {
                         out[k]++;
                 i++;
             }
-            return out;
+            return <Laziable<number>>Object.setPrototypeOf(out, Laziable.prototype);
         }
 
         /**
@@ -1861,6 +1865,14 @@ namespace LazyList {
 
         get saved() {
             return this.cached.length;
+        }
+    }
+
+    /** Array that can be converted to a {@link LazyAbstractList} with a convenient method ({@link lazy}) */
+    export class Laziable<T> extends Array<T> {
+        /** Converts {@link this} into a {@link LazyAbstractList} */
+        lazy<T = any>(this: Source<T>) {
+            return from(this);
         }
     }
 }

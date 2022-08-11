@@ -8,9 +8,11 @@ declare type RootElementType<T> = T extends Iterable<infer U> ? RootElementType<
  * @param source The iterable/iterator
  * @param force If `true`, {@link source} is always wrapped
  */
-declare function LazyList<T = any>(source?: Iterable<T> | Iterator<T> | (() => Iterator<T>), force?: boolean): LazyList.LazyAbstractList<T>;
+declare function LazyList<T = any>(source?: LazyList.Source<T>, force?: boolean): LazyList.LazyAbstractList<T>;
 declare namespace LazyList {
     const from: typeof LazyList;
+    /** Represents something which can be converted to a {@link LazyAbstractList} through {@link from} */
+    type Source<T> = Iterable<T> | Iterator<T> | (() => Iterator<T>);
     /** Represents data structure with a numeric indexer and a length that do not need to be writable */
     type ReadOnlyIndexable<T> = {
         readonly [k: number]: T;
@@ -420,8 +422,9 @@ declare namespace LazyList {
         /**
          * Given multiple predicate functions it returns an array containing for each function the times it returned `true`
          * @param p The predicate functions
+         * @returns An array with a function to convert it in a {@link LazyAbstractList} ({@link Laziable.prototype.lazy})
          */
-        multiCount(...p: Predicate<T, LazyAbstractList<T>>[]): number[];
+        multiCount(...p: Predicate<T, LazyAbstractList<T>>[]): Laziable<number>;
         /**
          * Joins the list elements using {@link sep} as the separator
          * @param sep The separator
@@ -889,6 +892,11 @@ declare namespace LazyList {
         get last(): T;
         get fastCount(): number;
         get saved(): number;
+    }
+    /** Array that can be converted to a {@link LazyAbstractList} with a convenient method ({@link lazy}) */
+    class Laziable<T> extends Array<T> {
+        /** Converts {@link this} into a {@link LazyAbstractList} */
+        lazy<T = any>(this: Source<T>): LazyAbstractList<T>;
     }
 }
 export = LazyList;

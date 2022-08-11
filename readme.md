@@ -60,6 +60,7 @@ For the details look at the JSDocs.
 Classes without methods:
 - **`LazyBufferList`**: Creates an iterable that stores only a chunk of data at the time and changes the loaded chunk when the index is out of range
 - **`BufferIterator`**: Similiar to `LazyBufferList`, but allows the storage of the current position
+- **`Laziable`**: Array that can be converted to a `LazyList` with a convenient method
 Methods that generate other `LazyList`s:
 - (static & hack) **`injectInto`**: Makes every instance of the provided class a `LazyList` and returns the module for chaining; If the class is not provided `Generator` will be used
 - (static) **`fastCount`**: Returns the length of the provided arbitrary object if it is easy to compute, `-1` otherwise
