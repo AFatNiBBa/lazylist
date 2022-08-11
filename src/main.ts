@@ -668,6 +668,23 @@ namespace LazyList {
         }
 
         /**
+         * Given multiple predicate functions it returns an array containing for each function the times it returned `true`
+         * @param p The predicate functions
+         */
+        multiCount(...p: Predicate<T, LazyAbstractList<T>>[]) {
+            var i = 0;
+            const out = p.map(() => 0);
+            for (const elm of this)
+            {
+                for (var k = 0; k < p.length; k++)
+                    if (p[k](elm, i, this))
+                        out[k]++;
+                i++;
+            }
+            return out;
+        }
+
+        /**
          * Joins the list elements using {@link sep} as the separator
          * @param sep The separator
          */

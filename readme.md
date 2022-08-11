@@ -44,6 +44,7 @@ For the details look at the JSDocs.
 - **`has`**: Returns `true` if a value is in the list; If nothing is provided returns `true` if the list has at list one element
 - **`indexOf`**: Returns the index of the provided value in the list if found, `-1` otherwise
 - **`find`**: Returns the index of the first element of the current list for which the provided function returns `true` end the element itself; If nothing is found returns `[ -1, null ]`
+- **`multiCount`**: Given multiple predicate functions it returns an array containing for each function the times it returned `true`
 - **`concat`**: Joins the list elements using the given separator
 - **`min`**: Returns the smallest number in the list based on a provided function
 - **`max`**: Returns the biggest number in the list based on a provided function

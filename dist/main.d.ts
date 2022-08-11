@@ -418,6 +418,11 @@ declare namespace LazyList {
          */
         find(p: Predicate<T, LazyAbstractList<T>>): [number, T];
         /**
+         * Given multiple predicate functions it returns an array containing for each function the times it returned `true`
+         * @param p The predicate functions
+         */
+        multiCount(...p: Predicate<T, LazyAbstractList<T>>[]): number[];
+        /**
          * Joins the list elements using {@link sep} as the separator
          * @param sep The separator
          */
