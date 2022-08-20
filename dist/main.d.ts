@@ -238,15 +238,17 @@ declare namespace LazyList {
         /**
          * Skips the first {@link p} elements of the list
          * @param p The elements to skip (Use a negative number to skip from the end); If a function is given, it will be called for each element and the elements will be skipped until the function returns `false`
+         * @param leftOnNegative Usually, if {@link p} is negative, the LAST -{@link p} elements will be skipped; If `true`, the elements will be skipped from the beginning
          */
-        skip(p: Predicate<T, LazySkipList<T>> | number): LazySkipList<T>;
+        skip(p: Predicate<T, LazySkipList<T>> | number, leftOnNegative?: boolean): LazySkipList<T>;
         /**
          * Takes the first {@link p} elements of the list and skips the rest
          * @param p The elements to take (Use a negative number to take from the end); If a function is given, it will be called for each element and the elements will be taken until the function returns `false`
          * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many {@link def} as needed
          * @param def The value to use if the list is too short
+         * @param leftOnNegative Usually, if {@link p} is negative, the output will be the LAST -{@link p} elements; If `true`, the output will be taken from the beginning
          */
-        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T): LazyTakeList<T>;
+        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T, leftOnNegative?: boolean): LazyTakeList<T>;
         /**
          * Force the list to have at least {@link n} elements by concatenating as many {@link def} as needed at the beginning of the list.
          * If you want to pad at the end, use {@link take} instead (Be carefull to pass `true` as the second argument).
@@ -384,8 +386,9 @@ declare namespace LazyList {
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
          * @param length The length of the section; Can be whatever you can pass as the first argument of {@link take}
          * @param mode If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many {@link def} as needed
+         * @param leftOnNegative Usually, if {@link length} is negative, the last -{@link length} elements will be SKIPPED; If `true`, the last -{@link length} elements before {@link start} will be taken instead; Only works if both {@link start} and {@link length} are numbers
          */
-        slice(start: Predicate<T, LazySkipList<T>> | number, length: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T): LazyTakeList<T>;
+        slice(start: Predicate<T, LazySkipList<T>> | number, length: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T, leftOnNegative?: boolean): LazyTakeList<T>;
         /**
          * Returns the element at the provided index
          * @param n The index; If negative it starts from the end
@@ -743,7 +746,8 @@ declare namespace LazyList {
     /** Output of {@link LazyAbstractList.skip} */
     class LazySkipList<T> extends LazyFixedList<T, T> {
         p: Predicate<T, LazySkipList<T>> | number;
-        constructor(source: Iterable<T>, p: Predicate<T, LazySkipList<T>> | number);
+        leftOnNegative?: boolean;
+        constructor(source: Iterable<T>, p: Predicate<T, LazySkipList<T>> | number, leftOnNegative?: boolean);
         static skip<T>(iter: MarkedIterator<T>, n: number): Generator<T, void, unknown>;
         [Symbol.iterator](): Generator<T, void, unknown>;
         get fastCount(): number;
@@ -753,7 +757,8 @@ declare namespace LazyList {
         p: Predicate<T, LazyTakeList<T>> | number;
         mode: JoinMode | boolean;
         def?: T;
-        constructor(source: Iterable<T>, p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T);
+        leftOnNegative?: boolean;
+        constructor(source: Iterable<T>, p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T, leftOnNegative?: boolean);
         static take<T>(iter: MarkedIterator<T>, n: number, mode?: JoinMode | boolean, def?: T): Generator<T, void, unknown>;
         static takeWhile<T, TList>(iter: MarkedIterator<T>, p: Predicate<T, TList>, list?: TList): Generator<T, void, unknown>;
         [Symbol.iterator](): Generator<T, void, unknown>;

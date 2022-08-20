@@ -308,18 +308,20 @@ function LazyList(source, force = false) {
         /**
          * Skips the first {@link p} elements of the list
          * @param p The elements to skip (Use a negative number to skip from the end); If a function is given, it will be called for each element and the elements will be skipped until the function returns `false`
+         * @param leftOnNegative Usually, if {@link p} is negative, the LAST -{@link p} elements will be skipped; If `true`, the elements will be skipped from the beginning
          */
-        skip(p) {
-            return new LazySkipList(this, p);
+        skip(p, leftOnNegative) {
+            return new LazySkipList(this, p, leftOnNegative);
         }
         /**
          * Takes the first {@link p} elements of the list and skips the rest
          * @param p The elements to take (Use a negative number to take from the end); If a function is given, it will be called for each element and the elements will be taken until the function returns `false`
          * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many {@link def} as needed
          * @param def The value to use if the list is too short
+         * @param leftOnNegative Usually, if {@link p} is negative, the output will be the LAST -{@link p} elements; If `true`, the output will be taken from the beginning
          */
-        take(p, mode, def) {
-            return new LazyTakeList(this, p, mode, def);
+        take(p, mode, def, leftOnNegative) {
+            return new LazyTakeList(this, p, mode, def, leftOnNegative);
         }
         /**
          * Force the list to have at least {@link n} elements by concatenating as many {@link def} as needed at the beginning of the list.
@@ -502,9 +504,12 @@ function LazyList(source, force = false) {
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
          * @param length The length of the section; Can be whatever you can pass as the first argument of {@link take}
          * @param mode If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many {@link def} as needed
+         * @param leftOnNegative Usually, if {@link length} is negative, the last -{@link length} elements will be SKIPPED; If `true`, the last -{@link length} elements before {@link start} will be taken instead; Only works if both {@link start} and {@link length} are numbers
          */
-        slice(start, length, mode, def) {
-            return this.skip(start).take(length, mode, def);
+        slice(start, length, mode, def, leftOnNegative) {
+            if (typeof start === "number" && typeof length === "number" && length < 0 && leftOnNegative)
+                start -= (length *= -1);
+            return this.skip(start, true).take(length, mode, def, true);
         }
         //////////////////////////////////////////////////// AGGREGATE ////////////////////////////////////////////////////
         /**
@@ -1306,9 +1311,10 @@ function LazyList(source, force = false) {
     LazyList.LazyRotateList = LazyRotateList;
     /** Output of {@link LazyAbstractList.skip} */
     class LazySkipList extends LazyFixedList {
-        constructor(source, p) {
+        constructor(source, p, leftOnNegative) {
             super(source);
             this.p = p;
+            this.leftOnNegative = leftOnNegative;
         }
         static *skip(iter, n) {
             for (var i = 0; i < n; i++)
@@ -1320,11 +1326,9 @@ function LazyList(source, force = false) {
             if (typeof this.p === "number") {
                 if (this.p < 0) {
                     const [iter, l] = this.calcLength();
-                    yield* LazyTakeList.take(iter[Symbol.iterator](), l + this.p);
+                    return yield* (this.leftOnNegative ? LazySkipList.skip : LazyTakeList.take)(iter[Symbol.iterator](), l + this.p);
                 }
-                else
-                    yield* LazySkipList.skip(this.source[Symbol.iterator](), this.p);
-                return;
+                return yield* LazySkipList.skip(this.source[Symbol.iterator](), this.p);
             }
             var i = 0, done = false;
             for (const elm of this.source)
@@ -1336,18 +1340,21 @@ function LazyList(source, force = false) {
                 return -1;
             const temp = super.fastCount;
             return ~temp
-                ? Math.max(0, temp - Math.abs(this.p))
+                ? this.leftOnNegative && this.p < 0
+                    ? Math.min(-this.p, temp)
+                    : Math.max(0, temp - Math.abs(this.p))
                 : -1;
         }
     }
     LazyList.LazySkipList = LazySkipList;
     /** Output of {@link LazyAbstractList.take} */
     class LazyTakeList extends LazyFixedList {
-        constructor(source, p, mode = false, def) {
+        constructor(source, p, mode = false, def, leftOnNegative) {
             super(source);
             this.p = p;
             this.mode = mode;
             this.def = def;
+            this.leftOnNegative = leftOnNegative;
         }
         static *take(iter, n, mode = false, def) {
             for (var value, i = 0; i < n; i++) // If this were a foreach loop the first element after "n" would have been calculated too
@@ -1371,6 +1378,8 @@ function LazyList(source, force = false) {
             if (typeof this.p === "number") {
                 if (this.p < 0) {
                     const [iter, l] = this.calcLength();
+                    if (this.leftOnNegative)
+                        return yield* LazyTakeList.take(iter[Symbol.iterator](), l + this.p, this.mode, this.def);
                     yield* LazySkipList.skip(iter[Symbol.iterator](), l + this.p);
                     if (this.mode)
                         for (var i = l; i < -this.p; i++)
@@ -1385,11 +1394,14 @@ function LazyList(source, force = false) {
         get fastCount() {
             if (typeof this.p === "function")
                 return -1;
-            if (this.mode)
+            const excludingFromEnd = this.leftOnNegative && this.p < 0;
+            if (this.mode && !excludingFromEnd)
                 return Math.abs(this.p);
             const temp = super.fastCount;
             return ~temp
-                ? Math.min(Math.abs(this.p), temp)
+                ? excludingFromEnd
+                    ? Math.max(0, temp + this.p)
+                    : Math.min(Math.abs(this.p), temp)
                 : -1;
         }
     }

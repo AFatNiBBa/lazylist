@@ -350,9 +350,10 @@ namespace LazyList {
         /**
          * Skips the first {@link p} elements of the list
          * @param p The elements to skip (Use a negative number to skip from the end); If a function is given, it will be called for each element and the elements will be skipped until the function returns `false`
+         * @param leftOnNegative Usually, if {@link p} is negative, the LAST -{@link p} elements will be skipped; If `true`, the elements will be skipped from the beginning
          */
-        skip(p: Predicate<T, LazySkipList<T>> | number) {
-            return new LazySkipList<T>(this, p);
+        skip(p: Predicate<T, LazySkipList<T>> | number, leftOnNegative?: boolean) {
+            return new LazySkipList<T>(this, p, leftOnNegative);
         }
 
         /**
@@ -360,9 +361,10 @@ namespace LazyList {
          * @param p The elements to take (Use a negative number to take from the end); If a function is given, it will be called for each element and the elements will be taken until the function returns `false`
          * @param mode If truthy and {@link p} is more than the list length, the output list will be forced to have length {@link p} by concatenating as many {@link def} as needed
          * @param def The value to use if the list is too short
+         * @param leftOnNegative Usually, if {@link p} is negative, the output will be the LAST -{@link p} elements; If `true`, the output will be taken from the beginning
          */
-        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T) {
-            return new LazyTakeList<T>(this, p, mode, def);
+        take(p: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T, leftOnNegative?: boolean) {
+            return new LazyTakeList<T>(this, p, mode, def, leftOnNegative);
         }
 
         /**
@@ -567,9 +569,12 @@ namespace LazyList {
          * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
          * @param length The length of the section; Can be whatever you can pass as the first argument of {@link take}
          * @param mode If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many {@link def} as needed
+         * @param leftOnNegative Usually, if {@link length} is negative, the last -{@link length} elements will be SKIPPED; If `true`, the last -{@link length} elements before {@link start} will be taken instead; Only works if both {@link start} and {@link length} are numbers
          */
-        slice(start: Predicate<T, LazySkipList<T>> | number, length: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T) {
-            return this.skip(start).take(length, mode, def);
+        slice(start: Predicate<T, LazySkipList<T>> | number, length: Predicate<T, LazyTakeList<T>> | number, mode?: JoinMode | boolean, def?: T, leftOnNegative?: boolean) {
+            if (typeof start === "number" && typeof length === "number" && length < 0 && leftOnNegative)
+                start -= (length *= -1);
+            return this.skip(start, true).take(length, mode, def, true);
         }
 
         //////////////////////////////////////////////////// AGGREGATE ////////////////////////////////////////////////////
@@ -1369,7 +1374,7 @@ namespace LazyList {
 
     /** Output of {@link LazyAbstractList.skip} */
     export class LazySkipList<T> extends LazyFixedList<T, T> {
-        constructor (source: Iterable<T>, public p: Predicate<T, LazySkipList<T>> | number) { super(source); }
+        constructor (source: Iterable<T>, public p: Predicate<T, LazySkipList<T>> | number, public leftOnNegative?: boolean) { super(source); }
 
         static *skip<T>(iter: MarkedIterator<T>, n: number) {
             for (var i = 0; i < n; i++)
@@ -1384,10 +1389,9 @@ namespace LazyList {
                 if (this.p < 0)
                 {
                     const [ iter, l ] = this.calcLength();
-                    yield* LazyTakeList.take(iter[Symbol.iterator](), l + this.p);
+                    return yield* (this.leftOnNegative ? LazySkipList.skip : LazyTakeList.take)(iter[Symbol.iterator](), l + this.p);
                 }
-                else yield* LazySkipList.skip(this.source[Symbol.iterator](), this.p);
-                return;
+                return yield* LazySkipList.skip(this.source[Symbol.iterator](), this.p);
             }
 
             var i = 0, done = false;
@@ -1402,14 +1406,16 @@ namespace LazyList {
 
             const temp = super.fastCount;
             return ~temp
-                ? Math.max(0, temp - Math.abs(this.p))
+                ? this.leftOnNegative && this.p < 0
+                    ? Math.min(-this.p, temp)
+                    : Math.max(0, temp - Math.abs(this.p))
                 : -1;
         }
     }
 
     /** Output of {@link LazyAbstractList.take} */
     export class LazyTakeList<T> extends LazyFixedList<T, T> {
-        constructor (source: Iterable<T>, public p: Predicate<T, LazyTakeList<T>> | number, public mode: JoinMode | boolean = false, public def?: T) { super(source); }
+        constructor (source: Iterable<T>, public p: Predicate<T, LazyTakeList<T>> | number, public mode: JoinMode | boolean = false, public def?: T, public leftOnNegative?: boolean) { super(source); }
 
         static *take<T>(iter: MarkedIterator<T>, n: number, mode: JoinMode | boolean = false, def?: T) {
             for (var value: T, i = 0; i < n; i++) // If this were a foreach loop the first element after "n" would have been calculated too
@@ -1437,6 +1443,9 @@ namespace LazyList {
                 if (this.p < 0)
                 {
                     const [ iter, l ] = this.calcLength();
+                    if (this.leftOnNegative)
+                        return yield* LazyTakeList.take(iter[Symbol.iterator](), l + this.p, this.mode, this.def);
+
                     yield* LazySkipList.skip(iter[Symbol.iterator](), l + this.p);
                     if (this.mode)
                         for (var i = l; i < -this.p; i++)
@@ -1451,12 +1460,15 @@ namespace LazyList {
             if (typeof this.p === "function")
                 return -1;
 
-            if (this.mode)
+            const excludingFromEnd = this.leftOnNegative && this.p < 0;
+            if (this.mode && !excludingFromEnd)
                 return Math.abs(this.p);
 
             const temp = super.fastCount;
             return ~temp
-                ? Math.min(Math.abs(this.p), temp)
+                ? excludingFromEnd
+                    ? Math.max(0, temp + this.p)
+                    : Math.min(Math.abs(this.p), temp)
                 : -1;
         }
     }
