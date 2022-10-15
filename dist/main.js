@@ -451,10 +451,11 @@ function LazyList(source, force = false) {
             return new LazyFixedList(await Promise.all(this));
         }
         /**
-         * Converts the list based on {@link f}
+         * Converts the list based on {@link f}.
+         * It is not named "then" because otherwise it would have been automatically executed if you await {@link await}
          * @param f A conversion function, to which values of the awaited type of {@link T} will be passed
          */
-        then(f) {
+        thenDo(f) {
             return new LazySelectList(this, async (x, i, list) => f(await x, i, list));
         }
         /**
@@ -1867,6 +1868,17 @@ function LazyList(source, force = false) {
         save(value) {
             this.cached.push(value);
             return value;
+        }
+        /**
+         * Gets a function that can be used as a {@link LazyBufferList} data source
+         * @param load The number of elements to load ahead of time
+         */
+        getBufferFunc(load = 0) {
+            return (x, self) => {
+                this.at(x + load);
+                self.start = self.offset = 0;
+                return this.cached;
+            };
         }
         get last() {
             return this.done

@@ -349,10 +349,11 @@ declare namespace LazyList {
         /** Calculates and awaits each element of the list and wraps them in a {@link LazyFixedList} */
         await<TAwaited>(this: LazyAbstractList<PromiseLike<TAwaited>>): Promise<LazyFixedList<TAwaited, TAwaited>>;
         /**
-         * Converts the list based on {@link f}
+         * Converts the list based on {@link f}.
+         * It is not named "then" because otherwise it would have been automatically executed if you await {@link await}
          * @param f A conversion function, to which values of the awaited type of {@link T} will be passed
          */
-        then<TAwaited, TResult>(this: LazyAbstractList<PromiseLike<TAwaited>>, f: Convert<TAwaited, TResult, LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>>): LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>;
+        thenDo<TAwaited, TResult>(this: LazyAbstractList<PromiseLike<TAwaited>>, f: Convert<TAwaited, TResult, LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>>): LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>;
         /**
          * Catches the promise errors using the {@link f} function
          * @param f A conversion function, to which errors of the list's promises will be passed
@@ -932,6 +933,11 @@ declare namespace LazyList {
         at(n: number, def?: T): any;
         inBound(n: number): boolean;
         save(value: T): T;
+        /**
+         * Gets a function that can be used as a {@link LazyBufferList} data source
+         * @param load The number of elements to load ahead of time
+         */
+        getBufferFunc(load?: number): (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>;
         get last(): T;
         get fastCount(): number;
         get saved(): number;
