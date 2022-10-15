@@ -509,10 +509,11 @@ namespace LazyList {
         }
 
         /**
-         * Converts the list based on {@link f}
+         * Converts the list based on {@link f}.
+         * It is not named "then" because otherwise it would have been automatically executed if you await {@link await}
          * @param f A conversion function, to which values of the awaited type of {@link T} will be passed 
          */
-        then<TAwaited, TResult>(this: LazyAbstractList<PromiseLike<TAwaited>>, f: Convert<TAwaited, TResult, LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>>) {
+        thenDo<TAwaited, TResult>(this: LazyAbstractList<PromiseLike<TAwaited>>, f: Convert<TAwaited, TResult, LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>>) {
             return new LazySelectList<PromiseLike<TAwaited>, Promise<TResult>>(this, async (x, i, list) => f(await x, i, list));
         }
 
@@ -1939,6 +1940,18 @@ namespace LazyList {
         save(value: T) {
             this.cached.push(value);
             return value;
+        }
+
+        /**
+         * Gets a function that can be used as a {@link LazyBufferList} data source
+         * @param load The number of elements to load ahead of time
+         */
+        getBufferFunc(load = 0): (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T> {
+            return (x, self) => {
+                this.at(x + load);
+                self.start = self.offset = 0;
+                return this.cached;
+            };
         }
 
         get last() {

@@ -108,7 +108,7 @@ Methods that generate other `LazyList`s:
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
 - (non lazy) **`calc`**: Calculates each element of the list and wraps them in another `LazyList`
 - (non lazy) **`await`**: Calculates and awaits each element of the list and wraps them in another `LazyList`
-- **`then`**: Applies a "then" function to each element of the current list (whose elements should be promises)
+- **`thenDo`**: Applies a "then" function to each element of the current list (whose elements should be promises)
 - **`catch`**: Applies a "catch" function to each element of the current list (whose elements should be promises)
 - **`ofType`**: Filters the list returning only the elements which are instances of the given constructor
 - **`assign`**: Executes `Object.assign()` on each element passing the given object as the second parameter
