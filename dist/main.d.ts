@@ -778,7 +778,7 @@ declare namespace LazyList {
         out?: TResult;
         hasOut: boolean;
         constructor(source: Iterable<T>, f: Combine<TResult, T, TResult, LazyAccumulateList<T, TResult>>, out?: TResult, hasOut?: boolean);
-        [Symbol.iterator](): Generator<any, void, unknown>;
+        [Symbol.iterator](): Generator<TResult>;
     }
     /** Output of {@link zip} */
     class LazyZipList<A, B, TResult = [A, B]> extends LazyFixedList<A, TResult> {
@@ -786,7 +786,7 @@ declare namespace LazyList {
         f?: Combine<A, B, TResult, LazyZipList<A, B, TResult>>;
         mode: JoinMode;
         constructor(source: Iterable<A>, other: Iterable<B>, f?: Combine<A, B, TResult, LazyZipList<A, B, TResult>>, mode?: JoinMode);
-        [Symbol.iterator](): Generator<any[] | TResult, void, unknown>;
+        [Symbol.iterator](): Generator<TResult>;
         get fastCount(): number;
     }
     /** Output of {@link join} */
@@ -796,7 +796,7 @@ declare namespace LazyList {
         f?: Combine<A, B, TResult, LazyJoinList<A, B, TResult>>;
         mode: JoinMode;
         constructor(source: Iterable<A>, other: Iterable<B>, p?: Combine<A, B, boolean, LazyJoinList<A, B, TResult>>, f?: Combine<A, B, TResult, LazyJoinList<A, B, TResult>>, mode?: JoinMode);
-        [Symbol.iterator](): Generator<TResult | (A | B)[], void, unknown>;
+        [Symbol.iterator](): Generator<TResult>;
         get fastCount(): number;
     }
     /** Output of {@link LazyAbstractList.combinations} */

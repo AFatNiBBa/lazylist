@@ -1490,10 +1490,10 @@ namespace LazyList {
     export class LazyAccumulateList<T, TResult = T> extends LazyFixedList<T, TResult> {
         constructor (source: Iterable<T>, public f: Combine<TResult, T, TResult, LazyAccumulateList<T, TResult>>, public out?: TResult, public hasOut: boolean = arguments.length > 2) { super(source); }
 
-        *[Symbol.iterator]() {
+        *[Symbol.iterator](): Generator<TResult> {
             var i = 0;
             var out: TResult;
-
+            
             var value: T;
             const iter = this.source[Symbol.iterator]();
             if (!this.hasOut)
@@ -1512,7 +1512,7 @@ namespace LazyList {
     export class LazyZipList<A, B, TResult = [ A, B ]> extends LazyFixedList<A, TResult> {
         constructor(source: Iterable<A>, public other: Iterable<B>, public f?: Combine<A, B, TResult, LazyZipList<A, B, TResult>>, public mode: JoinMode = JoinMode.inner) { super(source); }
 
-        *[Symbol.iterator]() {
+        *[Symbol.iterator](): Generator<TResult> {
             var i = 0;
             const source = this.source[Symbol.iterator]();
             const other = this.other[Symbol.iterator]();
@@ -1524,7 +1524,7 @@ namespace LazyList {
                     break;
                 yield this.f
                     ? this.f(a.value, b.value, i++, this)
-                    : [ a.value, b.value ];
+                    : [ a.value, b.value ] as any;
             }
         }
 
@@ -1549,7 +1549,7 @@ namespace LazyList {
     export class LazyJoinList<A, B, TResult = [ A, B ]> extends LazyFixedList<A, TResult> {
         constructor(source: Iterable<A>, public other: Iterable<B>, public p?: Combine<A, B, boolean, LazyJoinList<A, B, TResult>>, public f?: Combine<A, B, TResult, LazyJoinList<A, B, TResult>>, public mode: JoinMode = JoinMode.inner) { super(source); }
 
-        *[Symbol.iterator]() {
+        *[Symbol.iterator](): Generator<TResult> {
             type State<T> = { v: T, c?: boolean };
             const cacheA: State<A>[] = [];
             const cacheB: State<B>[] = [];
@@ -1567,7 +1567,7 @@ namespace LazyList {
                     if (temp)
                         yield this.f
                             ? this.f(a, bE.v, i, this)
-                            : [ a, bE.v ];
+                            : [ a, bE.v ] as any;
                 }
                 i++;
             }
@@ -1578,7 +1578,7 @@ namespace LazyList {
                     if (!elm.c)
                         yield this.f
                             ? this.f(elm.v, undefined, -1, this)
-                            : [ elm.v, undefined ];
+                            : [ elm.v, undefined ] as any;
 
             // Outer (right)
             if (this.mode & JoinMode.right)
@@ -1586,7 +1586,7 @@ namespace LazyList {
                     if (!elm.c)
                         yield this.f
                             ? this.f(undefined, elm.v, -1, this)
-                            : [ undefined, elm.v ];
+                            : [ undefined, elm.v ] as any;
         }
 
         get fastCount() {
