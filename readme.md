@@ -97,10 +97,11 @@ Methods that generate other `LazyList`s:
 - (non lazy) **`padStart`**: Force the list to have at least `n` elements by concatenating as many default values (Provided by input) as needed at the beginning of the list
 - **`accumulate`**: Aggregates the list based on a provided function but yields the intermediate results too
 - **`zip`**: Combines the current list to an iterable based on a provided function
-- **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met.
+- **`join`**: Joins the current list to an iterable based on a provided function, where a condition is met
 - **`combinations`**: Generates all the possible combinations of the provided length of the elements of the list
-- **`storeBy`**: Lazy version of `groupBy`, the groups cannot be iterated, only their element can
 - (non lazy) **`groupBy`**: Groups the list's elements based on a provided function
+- **`reGroup`**: Converts each group of the list based on a provided function, and reapplies the keys to the output elements (Only available on the output of `groupBy` and `reGroup`)
+- **`storeBy`**: Lazy version of `groupBy`, the groups cannot be iterated, only their elements can
 - (non lazy | unsafe) **`split`**: Groups the list's elements, `n` at a time or splits it according to a predicate; Passing `true` as the `lazy` argument will make the list lazy but unsafe
 - **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
 - **`toSet`**: Returns a set that contains the elements of the current list

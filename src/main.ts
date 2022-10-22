@@ -296,7 +296,8 @@ namespace LazyList {
         }
 
         /**
-         * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link comp} since it would be wrong).
+         * Orders the list using selection sort, so that it computes the entire list all at once but sorts it lazily.
+         * The current index of the "inner" iteration is available inside of {@link comp}.
          * Non lazy
          * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
          * @param desc If `true`, reverses the results
@@ -306,8 +307,9 @@ namespace LazyList {
         }
 
         /**
-         * Orders the list based on the return value of {@link f}; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} and {@link comp} since it would be wrong).
+         * Orders the list based on the return value of {@link f} using selection sort, so that it computes the entire list all at once but sorts it lazily.
          * Differs from {@link sort} in that {@link comp} is provided with the return value of {@link f}, and not the element itself.
+         * The current index of the "inner" iteration is available inside of {@link comp}.
          * Non lazy
          * @param f A conversion function
          * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
@@ -424,6 +426,15 @@ namespace LazyList {
 
         /**
          * Groups the list's elements based on a provided function.
+         * Non lazy
+         * @param f A combination function
+         */
+        groupBy<TKey>(f: Convert<T, TKey, LazyGroupByList<T, TKey>>) {
+            return new LazyGroupByList<T, TKey>(this, f);
+        }
+
+        /**
+         * Groups the list's elements based on a provided function.
          * Similiar to {@link groupBy}, but the groups cannot be completely iterated until the evalueation is finisced, only what is inside them can.
          * You can use the {@link LazyStore.get} method to get the desired group like so:
          * ```
@@ -436,15 +447,6 @@ namespace LazyList {
          */
         storeBy<TKey>(f: Convert<T, TKey, LazyStoreByList<T, TKey>>) {
             return new LazyStore<T, TKey>(this, f);
-        }
-
-        /**
-         * Groups the list's elements based on a provided function.
-         * Non lazy
-         * @param f A combination function
-         */
-        groupBy<TKey>(f: Convert<T, TKey, LazyGroupByList<T, TKey>>) {
-            return new LazyGroupByList<T, TKey>(this, f);
         }
 
         /**
@@ -1264,31 +1266,24 @@ namespace LazyList {
         constructor(source: Iterable<T>, public f: Combine<T, T, number, LazySortList<T>> = LazySortList.defaultComparer, public desc: boolean = false) { super(source); }
 
         *[Symbol.iterator]() {
-            const map = new Map<T, number>();
-            for (const elm of this.root)
-                map.set(elm, (map.get(elm) ?? 0) + 1);
-
-            while (map.size)
+            const out = Array.from(this.root);
+            for (var i = 0; i < out.length; i++)
             {
-                var out: T, n: number = 0;
-                for (const elm of map)
-                    if (!n || this.compare(elm[0], out) < 0)
-                        [ out, n ] = elm;
+                for (var k = i + 1; k < out.length; k++)
+                    if (this.compare(out[k], out[i], k) < 0)
+                        [ out[i], out[k] ] = [ out[k], out[i] ];
 
-                for (var i = 0; i < n; i++)
-                    yield out;
-                
-                map.delete(out);
+                yield out[i];
             }
         }
 
         /** A sorting function that allows two sorts in a row to be combined */
-        compare(a: T, b: T) {
-            return this.multiplier * this.f(a, b, -1, this) || this.source instanceof LazySortList && this.source.compare(a, b);
+        compare(a: T, b: T, i: number) {
+            return this.multiplier * this.f(a, b, i, this) || this.source instanceof LazySortList && this.source.compare(a, b, i);
         }
 
         /** Obtains the {@link source} of the first sort of the current chain */
-        get root() {
+        get root(): Iterable<T> {
             return this.source instanceof LazySortList ? this.source.root : this.source;
         }
 
@@ -1635,6 +1630,82 @@ namespace LazyList {
         }
     }
 
+    /**
+     * Element of the output of {@link groupBy}.
+     * The group common value is contained in the {@link key} property.
+     * The group is a {@link LazyAbstractList} itself
+     */
+    export class Grouping<T, TKey> extends LazyFixedList<T, T> {
+        constructor(public key: TKey, source: Iterable<T>) { super(source); }
+    }
+
+    /** Output of {@link reGroup} */
+    export class LazyGroupList<T, TKey, I = Grouping<T, TKey>> extends LazySourceList<I, Grouping<T, TKey>> {
+        /**
+         * Converts each group of the list based on {@link f}, and reapplies the keys to the output elements
+         * @param f A conversion function
+         */
+        reGroup<TResult>(f: Convert<Grouping<T, TKey>, Iterable<TResult>, LazyGroupList<T, TKey, I>>): LazyGroupList<TResult, TKey> {
+            return new LazyGroupList<TResult, TKey>(this.select((x, i) => new Grouping(x.key, f(x, i, this))));
+        }
+    }
+
+    /** Output of {@link groupBy} */
+    export class LazyGroupByList<T, TKey> extends LazyGroupList<T, TKey, T> {
+        constructor(source: Iterable<T>, public f: Convert<T, TKey, LazyGroupByList<T, TKey>>) { super(source); }
+
+        *[Symbol.iterator]() {
+            var i = 0;
+            const cache = new Map<TKey, T[]>();
+            for (const e of this.source)
+            {
+                const k = this.f(e, i++, this);
+                if (cache.has(k))
+                    cache.get(k).push(e);
+                else
+                    cache.set(k, [ e ]);           
+            }
+            for (const [ k, v ] of cache)
+                yield new Grouping<T, TKey>(k, v);
+        }
+    }
+
+    /** Output of {@link LazyStore.get} */
+    export class LazyStoreByList<T, TKey> extends LazyAbstractList<T> {
+        processed: number = 0;
+        cached: T[] = [];
+        constructor(public key: TKey, public store: LazyStore<T, TKey>) { super(); }
+
+        *[Symbol.iterator]() {
+            const { store } = this;
+
+            // Pre-cached elements
+            for (var i = 0; i < this.processed; i++)
+                yield this.cached[i];
+
+            // Elements added by other lists before that this starts
+            yield* this.flush();
+
+            // Elements added by this list
+            for (var value: T; !({ value, done: store.done } = store.iter.next()).done; )
+            {
+                const k = store.f(value, store.processed++, this);
+                if (k === this.key)
+                {
+                    yield this.cached[this.processed++] = value;
+                    yield* this.flush(); // Flushes only in this case because the elements can be added by other lists only during yields
+                }
+                else store.get(k).cached.push(value);
+            }
+        }
+
+        /** Yields the elements that have been cached by other lists in {@link store} */
+        *flush() {
+            for (; this.processed < this.cached.length; this.processed++)
+                yield this.cached[this.processed];
+        }
+    }
+
     /** Output of {@link LazyAbstractList.storeBy} */
     export class LazyStore<T, TKey> {
         map: Map<TKey, LazyStoreByList<T, TKey>> = new Map();
@@ -1651,76 +1722,13 @@ namespace LazyList {
         get(k: TKey) {
             var out = this.map.get(k);
             if (!out)
-                this.map.set(k, out = new LazyStoreByList<T, TKey>(k, this, this.f));
+                this.map.set(k, out = new LazyStoreByList<T, TKey>(k, this));
             return out;
         }
 
         /** The iterator to cache */
         get iter() {
             return this.#iter ??= this.source[Symbol.iterator]();
-        }
-    }
-
-    /** Output of {@link LazyStore.get} */
-    export class LazyStoreByList<T, TKey> extends LazyAbstractList<T> {
-        processed: number = 0;
-        cached: T[] = [];
-        constructor(public key: TKey, public store: LazyStore<T, TKey>, public f: Convert<T, TKey, LazyStoreByList<T, TKey>>) { super(); }
-
-        *[Symbol.iterator]() {
-            // Pre-cached elements
-            for (var i = 0; i < this.processed; i++)
-                yield this.cached[i];
-
-            // Elements added by other lists before that this starts
-            yield* this.flush();
-
-            // Elements added by this list
-            for (var value: T; !({ value, done: this.store.done } = this.store.iter.next()).done; )
-            {
-                const k = this.f(value, this.store.processed++, this);
-                if (k === this.key)
-                {
-                    yield this.cached[this.processed++] = value;
-                    yield* this.flush(); // Flushes only in this case because the elements can be added by other lists only during yields
-                }
-                else this.store.get(k).cached.push(value);
-            }
-        }
-
-        /** Yields the elements that have been cached by other lists in {@link store} */
-        *flush() {
-            for (; this.processed < this.cached.length; this.processed++)
-                yield this.cached[this.processed];
-        }
-    }
-
-    /**
-     * Element of the output of {@link groupBy}.
-     * The group common value is contained in the {@link key} property.
-     * The group is a {@link LazyAbstractList} itself
-     */
-    export class Grouping<T, TKey> extends LazyFixedList<T, T> {
-        constructor(public key: TKey, source: Iterable<T>) { super(source); }
-    }
-
-    /** Output of {@link groupBy} */
-    export class LazyGroupByList<T, TKey> extends LazySourceList<T, Grouping<T, TKey>> {
-        constructor(source: Iterable<T>, public f: Convert<T, TKey, LazyGroupByList<T, TKey>>) { super(source); }
-
-        *[Symbol.iterator]() {
-            var i = 0;
-            const cache = new Map<TKey, T[]>();
-            for (const e of this.source)
-            {
-                const k = this.f(e, i++, this);
-                if (cache.has(k))
-                    cache.get(k).push(e);
-                else
-                    cache.set(k, [ e ]);           
-            }
-            for (const [ k, v ] of cache)
-                yield new Grouping<T, TKey>(k, v);
         }
     }
 
@@ -1952,6 +1960,14 @@ namespace LazyList {
                 self.start = self.offset = 0;
                 return this.cached;
             };
+        }
+
+        /**
+         * Gets a {@link BufferIterator} that uses this cache as its data source
+         * @param load The number of elements to load ahead of time
+         */
+        getIterator(load = 0) {
+            return new BufferIterator<T>(this.getBufferFunc(load));
         }
 
         get last() {

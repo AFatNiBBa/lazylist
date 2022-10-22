@@ -259,7 +259,8 @@ function LazyList(source, force = false) {
             return new LazyShuffleList(this);
         }
         /**
-         * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link comp} since it would be wrong).
+         * Orders the list using selection sort, so that it computes the entire list all at once but sorts it lazily.
+         * The current index of the "inner" iteration is available inside of {@link comp}.
          * Non lazy
          * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
          * @param desc If `true`, reverses the results
@@ -268,8 +269,9 @@ function LazyList(source, force = false) {
             return new LazySortList(this, comp, desc);
         }
         /**
-         * Orders the list based on the return value of {@link f}; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} and {@link comp} since it would be wrong).
+         * Orders the list based on the return value of {@link f} using selection sort, so that it computes the entire list all at once but sorts it lazily.
          * Differs from {@link sort} in that {@link comp} is provided with the return value of {@link f}, and not the element itself.
+         * The current index of the "inner" iteration is available inside of {@link comp}.
          * Non lazy
          * @param f A conversion function
          * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
@@ -375,6 +377,14 @@ function LazyList(source, force = false) {
         }
         /**
          * Groups the list's elements based on a provided function.
+         * Non lazy
+         * @param f A combination function
+         */
+        groupBy(f) {
+            return new LazyGroupByList(this, f);
+        }
+        /**
+         * Groups the list's elements based on a provided function.
          * Similiar to {@link groupBy}, but the groups cannot be completely iterated until the evalueation is finisced, only what is inside them can.
          * You can use the {@link LazyStore.get} method to get the desired group like so:
          * ```
@@ -387,14 +397,6 @@ function LazyList(source, force = false) {
          */
         storeBy(f) {
             return new LazyStore(this, f);
-        }
-        /**
-         * Groups the list's elements based on a provided function.
-         * Non lazy
-         * @param f A combination function
-         */
-        groupBy(f) {
-            return new LazyGroupByList(this, f);
         }
         /**
          * Groups the list's elements, {@link n} at a time.
@@ -1201,22 +1203,17 @@ function LazyList(source, force = false) {
             this.desc = desc;
         }
         *[Symbol.iterator]() {
-            const map = new Map();
-            for (const elm of this.root)
-                map.set(elm, (map.get(elm) ?? 0) + 1);
-            while (map.size) {
-                var out, n = 0;
-                for (const elm of map)
-                    if (!n || this.compare(elm[0], out) < 0)
-                        [out, n] = elm;
-                for (var i = 0; i < n; i++)
-                    yield out;
-                map.delete(out);
+            const out = Array.from(this.root);
+            for (var i = 0; i < out.length; i++) {
+                for (var k = i + 1; k < out.length; k++)
+                    if (this.compare(out[k], out[i], k) < 0)
+                        [out[i], out[k]] = [out[k], out[i]];
+                yield out[i];
             }
         }
         /** A sorting function that allows two sorts in a row to be combined */
-        compare(a, b) {
-            return this.multiplier * this.f(a, b, -1, this) || this.source instanceof LazySortList && this.source.compare(a, b);
+        compare(a, b, i) {
+            return this.multiplier * this.f(a, b, i, this) || this.source instanceof LazySortList && this.source.compare(a, b, i);
         }
         /** Obtains the {@link source} of the first sort of the current chain */
         get root() {
@@ -1576,68 +1573,6 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.LazyCombinationsList = LazyCombinationsList;
-    /** Output of {@link LazyAbstractList.storeBy} */
-    class LazyStore {
-        constructor(source, f) {
-            this.source = source;
-            this.f = f;
-            this.map = new Map();
-            this.processed = 0;
-            this.done = false;
-            _LazyStore_iter.set(this, void 0);
-        }
-        /**
-         * Returns the list of the elements with the given key.
-         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} could cause unexpected behaviours (Some elements could not be present)
-         * @param k The key to search for
-         */
-        get(k) {
-            var out = this.map.get(k);
-            if (!out)
-                this.map.set(k, out = new LazyStoreByList(k, this, this.f));
-            return out;
-        }
-        /** The iterator to cache */
-        get iter() {
-            return __classPrivateFieldSet(this, _LazyStore_iter, __classPrivateFieldGet(this, _LazyStore_iter, "f") ?? this.source[Symbol.iterator](), "f");
-        }
-    }
-    _LazyStore_iter = new WeakMap();
-    LazyList.LazyStore = LazyStore;
-    /** Output of {@link LazyStore.get} */
-    class LazyStoreByList extends LazyAbstractList {
-        constructor(key, store, f) {
-            super();
-            this.key = key;
-            this.store = store;
-            this.f = f;
-            this.processed = 0;
-            this.cached = [];
-        }
-        *[Symbol.iterator]() {
-            // Pre-cached elements
-            for (var i = 0; i < this.processed; i++)
-                yield this.cached[i];
-            // Elements added by other lists before that this starts
-            yield* this.flush();
-            // Elements added by this list
-            for (var value; !({ value, done: this.store.done } = this.store.iter.next()).done;) {
-                const k = this.f(value, this.store.processed++, this);
-                if (k === this.key) {
-                    yield this.cached[this.processed++] = value;
-                    yield* this.flush(); // Flushes only in this case because the elements can be added by other lists only during yields
-                }
-                else
-                    this.store.get(k).cached.push(value);
-            }
-        }
-        /** Yields the elements that have been cached by other lists in {@link store} */
-        *flush() {
-            for (; this.processed < this.cached.length; this.processed++)
-                yield this.cached[this.processed];
-        }
-    }
-    LazyList.LazyStoreByList = LazyStoreByList;
     /**
      * Element of the output of {@link groupBy}.
      * The group common value is contained in the {@link key} property.
@@ -1650,8 +1585,19 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.Grouping = Grouping;
+    /** Output of {@link reGroup} */
+    class LazyGroupList extends LazySourceList {
+        /**
+         * Converts each group of the list based on {@link f}, and reapplies the keys to the output elements
+         * @param f A conversion function
+         */
+        reGroup(f) {
+            return new LazyGroupList(this.select((x, i) => new Grouping(x.key, f(x, i, this))));
+        }
+    }
+    LazyList.LazyGroupList = LazyGroupList;
     /** Output of {@link groupBy} */
-    class LazyGroupByList extends LazySourceList {
+    class LazyGroupByList extends LazyGroupList {
         constructor(source, f) {
             super(source);
             this.f = f;
@@ -1671,6 +1617,68 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.LazyGroupByList = LazyGroupByList;
+    /** Output of {@link LazyStore.get} */
+    class LazyStoreByList extends LazyAbstractList {
+        constructor(key, store) {
+            super();
+            this.key = key;
+            this.store = store;
+            this.processed = 0;
+            this.cached = [];
+        }
+        *[Symbol.iterator]() {
+            const { store } = this;
+            // Pre-cached elements
+            for (var i = 0; i < this.processed; i++)
+                yield this.cached[i];
+            // Elements added by other lists before that this starts
+            yield* this.flush();
+            // Elements added by this list
+            for (var value; !({ value, done: store.done } = store.iter.next()).done;) {
+                const k = store.f(value, store.processed++, this);
+                if (k === this.key) {
+                    yield this.cached[this.processed++] = value;
+                    yield* this.flush(); // Flushes only in this case because the elements can be added by other lists only during yields
+                }
+                else
+                    store.get(k).cached.push(value);
+            }
+        }
+        /** Yields the elements that have been cached by other lists in {@link store} */
+        *flush() {
+            for (; this.processed < this.cached.length; this.processed++)
+                yield this.cached[this.processed];
+        }
+    }
+    LazyList.LazyStoreByList = LazyStoreByList;
+    /** Output of {@link LazyAbstractList.storeBy} */
+    class LazyStore {
+        constructor(source, f) {
+            this.source = source;
+            this.f = f;
+            this.map = new Map();
+            this.processed = 0;
+            this.done = false;
+            _LazyStore_iter.set(this, void 0);
+        }
+        /**
+         * Returns the list of the elements with the given key.
+         * WARNING: Having more than 1 active iterator at same time on the same {@link LazyStoreByList} could cause unexpected behaviours (Some elements could not be present)
+         * @param k The key to search for
+         */
+        get(k) {
+            var out = this.map.get(k);
+            if (!out)
+                this.map.set(k, out = new LazyStoreByList(k, this));
+            return out;
+        }
+        /** The iterator to cache */
+        get iter() {
+            return __classPrivateFieldSet(this, _LazyStore_iter, __classPrivateFieldGet(this, _LazyStore_iter, "f") ?? this.source[Symbol.iterator](), "f");
+        }
+    }
+    _LazyStore_iter = new WeakMap();
+    LazyList.LazyStore = LazyStore;
     /** Output of {@link split} */
     class LazySplitList extends LazySourceList {
         constructor(source, p, lazy = false, mode = false, def) {
@@ -1879,6 +1887,13 @@ function LazyList(source, force = false) {
                 self.start = self.offset = 0;
                 return this.cached;
             };
+        }
+        /**
+         * Gets a {@link BufferIterator} that uses this cache as its data source
+         * @param load The number of elements to load ahead of time
+         */
+        getIterator(load = 0) {
+            return new BufferIterator(this.getBufferFunc(load));
         }
         get last() {
             return this.done

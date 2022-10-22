@@ -199,15 +199,17 @@ declare namespace LazyList {
          */
         shuffle(): LazyShuffleList<T>;
         /**
-         * Orders the list; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link comp} since it would be wrong).
+         * Orders the list using selection sort, so that it computes the entire list all at once but sorts it lazily.
+         * The current index of the "inner" iteration is available inside of {@link comp}.
          * Non lazy
          * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
          * @param desc If `true`, reverses the results
          */
         sort(comp?: Combine<T, T, number, LazySortList<T>>, desc?: boolean): LazySortList<T>;
         /**
-         * Orders the list based on the return value of {@link f}; It counts the elements so that it is faster when there are a lot of copies (For that reason, the index is not available on {@link f} and {@link comp} since it would be wrong).
+         * Orders the list based on the return value of {@link f} using selection sort, so that it computes the entire list all at once but sorts it lazily.
          * Differs from {@link sort} in that {@link comp} is provided with the return value of {@link f}, and not the element itself.
+         * The current index of the "inner" iteration is available inside of {@link comp}.
          * Non lazy
          * @param f A conversion function
          * @param comp A sorting function (Return `1` if the first argument is greater than the second, `-1` if it is less, `0` if they are equal)
@@ -291,6 +293,12 @@ declare namespace LazyList {
         combinations(depth?: number): LazyCombinationsList<T>;
         /**
          * Groups the list's elements based on a provided function.
+         * Non lazy
+         * @param f A combination function
+         */
+        groupBy<TKey>(f: Convert<T, TKey, LazyGroupByList<T, TKey>>): LazyGroupByList<T, TKey>;
+        /**
+         * Groups the list's elements based on a provided function.
          * Similiar to {@link groupBy}, but the groups cannot be completely iterated until the evalueation is finisced, only what is inside them can.
          * You can use the {@link LazyStore.get} method to get the desired group like so:
          * ```
@@ -302,12 +310,6 @@ declare namespace LazyList {
          * @param f A combination function
          */
         storeBy<TKey>(f: Convert<T, TKey, LazyStoreByList<T, TKey>>): LazyStore<T, TKey>;
-        /**
-         * Groups the list's elements based on a provided function.
-         * Non lazy
-         * @param f A combination function
-         */
-        groupBy<TKey>(f: Convert<T, TKey, LazyGroupByList<T, TKey>>): LazyGroupByList<T, TKey>;
         /**
          * Groups the list's elements, {@link n} at a time.
          * Non lazy by default (It calculates {@link n} elements at a time), but can be made lazy by setting {@link lazy} as `true`.
@@ -713,9 +715,9 @@ declare namespace LazyList {
         constructor(source: Iterable<T>, f?: Combine<T, T, number, LazySortList<T>>, desc?: boolean);
         [Symbol.iterator](): Generator<T, void, unknown>;
         /** A sorting function that allows two sorts in a row to be combined */
-        compare(a: T, b: T): any;
+        compare(a: T, b: T, i: number): any;
         /** Obtains the {@link source} of the first sort of the current chain */
-        get root(): any;
+        get root(): Iterable<T>;
         /** Gets the number to which the result of {@link f} should be multiplied to be inverted when {@link desc} is true */
         get multiplier(): 1 | -1;
     }
@@ -808,6 +810,40 @@ declare namespace LazyList {
         [Symbol.iterator](): any;
         get fastCount(): number;
     }
+    /**
+     * Element of the output of {@link groupBy}.
+     * The group common value is contained in the {@link key} property.
+     * The group is a {@link LazyAbstractList} itself
+     */
+    class Grouping<T, TKey> extends LazyFixedList<T, T> {
+        key: TKey;
+        constructor(key: TKey, source: Iterable<T>);
+    }
+    /** Output of {@link reGroup} */
+    class LazyGroupList<T, TKey, I = Grouping<T, TKey>> extends LazySourceList<I, Grouping<T, TKey>> {
+        /**
+         * Converts each group of the list based on {@link f}, and reapplies the keys to the output elements
+         * @param f A conversion function
+         */
+        reGroup<TResult>(f: Convert<Grouping<T, TKey>, Iterable<TResult>, LazyGroupList<T, TKey, I>>): LazyGroupList<TResult, TKey>;
+    }
+    /** Output of {@link groupBy} */
+    class LazyGroupByList<T, TKey> extends LazyGroupList<T, TKey, T> {
+        f: Convert<T, TKey, LazyGroupByList<T, TKey>>;
+        constructor(source: Iterable<T>, f: Convert<T, TKey, LazyGroupByList<T, TKey>>);
+        [Symbol.iterator](): Generator<Grouping<T, TKey>, void, unknown>;
+    }
+    /** Output of {@link LazyStore.get} */
+    class LazyStoreByList<T, TKey> extends LazyAbstractList<T> {
+        key: TKey;
+        store: LazyStore<T, TKey>;
+        processed: number;
+        cached: T[];
+        constructor(key: TKey, store: LazyStore<T, TKey>);
+        [Symbol.iterator](): Generator<T, void, unknown>;
+        /** Yields the elements that have been cached by other lists in {@link store} */
+        flush(): Generator<T, void, unknown>;
+    }
     /** Output of {@link LazyAbstractList.storeBy} */
     class LazyStore<T, TKey> {
         #private;
@@ -825,33 +861,6 @@ declare namespace LazyList {
         get(k: TKey): LazyStoreByList<T, TKey>;
         /** The iterator to cache */
         get iter(): Iterator<T, any, undefined>;
-    }
-    /** Output of {@link LazyStore.get} */
-    class LazyStoreByList<T, TKey> extends LazyAbstractList<T> {
-        key: TKey;
-        store: LazyStore<T, TKey>;
-        f: Convert<T, TKey, LazyStoreByList<T, TKey>>;
-        processed: number;
-        cached: T[];
-        constructor(key: TKey, store: LazyStore<T, TKey>, f: Convert<T, TKey, LazyStoreByList<T, TKey>>);
-        [Symbol.iterator](): Generator<T, void, unknown>;
-        /** Yields the elements that have been cached by other lists in {@link store} */
-        flush(): Generator<T, void, unknown>;
-    }
-    /**
-     * Element of the output of {@link groupBy}.
-     * The group common value is contained in the {@link key} property.
-     * The group is a {@link LazyAbstractList} itself
-     */
-    class Grouping<T, TKey> extends LazyFixedList<T, T> {
-        key: TKey;
-        constructor(key: TKey, source: Iterable<T>);
-    }
-    /** Output of {@link groupBy} */
-    class LazyGroupByList<T, TKey> extends LazySourceList<T, Grouping<T, TKey>> {
-        f: Convert<T, TKey, LazyGroupByList<T, TKey>>;
-        constructor(source: Iterable<T>, f: Convert<T, TKey, LazyGroupByList<T, TKey>>);
-        [Symbol.iterator](): Generator<Grouping<T, TKey>, void, unknown>;
     }
     /** Output of {@link split} */
     class LazySplitList<T> extends LazySourceList<T, LazyAbstractList<T>> {
@@ -938,6 +947,11 @@ declare namespace LazyList {
          * @param load The number of elements to load ahead of time
          */
         getBufferFunc(load?: number): (n: number, list: LazyBufferList<T>) => ReadOnlyIndexable<T>;
+        /**
+         * Gets a {@link BufferIterator} that uses this cache as its data source
+         * @param load The number of elements to load ahead of time
+         */
+        getIterator(load?: number): BufferIterator<T>;
         get last(): T;
         get fastCount(): number;
         get saved(): number;
