@@ -473,6 +473,14 @@ namespace LazyList {
         }
 
         /**
+         * Like {@link but}, but the function is only executed on the first element
+         * @param f A function
+         */
+        onFirst(f: Convert<T, void, LazyOnFirstList<T>>) {
+            return new LazyOnFirstList<T>(this, f);
+        }
+
+        /**
          * Returns a {@link LazySet} that contains the elements of the list.
          * The set is lazy, this means that the elements are not calculated until it is checked if they are present.
          * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} could cause unexpected behaviours (Some elements could not be present)
@@ -1767,6 +1775,21 @@ namespace LazyList {
 
         get fastCount() {
             return 1;
+        }
+    }
+
+    /** Output of {@link onFirst} */
+    export class LazyOnFirstList<T> extends LazyFixedList<T> {
+        constructor (source: Iterable<T>, public f: Convert<T, void, LazyOnFirstList<T>>) { super(source); }
+
+        *[Symbol.iterator]() {
+            const iter = this.source[Symbol.iterator]();
+            const { value, done } = iter.next();
+            if (done) return;
+
+            this.f(value, 0, this);
+            yield value;
+            yield* toGenerator(iter);
         }
     }
 

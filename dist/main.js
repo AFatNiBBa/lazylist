@@ -420,6 +420,13 @@ function LazyList(source, force = false) {
             return new LazyWrapList(this);
         }
         /**
+         * Like {@link but}, but the function is only executed on the first element
+         * @param f A function
+         */
+        onFirst(f) {
+            return new LazyOnFirstList(this, f);
+        }
+        /**
          * Returns a {@link LazySet} that contains the elements of the list.
          * The set is lazy, this means that the elements are not calculated until it is checked if they are present.
          * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} could cause unexpected behaviours (Some elements could not be present)
@@ -1718,6 +1725,23 @@ function LazyList(source, force = false) {
         }
     }
     LazyList.LazyWrapList = LazyWrapList;
+    /** Output of {@link onFirst} */
+    class LazyOnFirstList extends LazyFixedList {
+        constructor(source, f) {
+            super(source);
+            this.f = f;
+        }
+        *[Symbol.iterator]() {
+            const iter = this.source[Symbol.iterator]();
+            const { value, done } = iter.next();
+            if (done)
+                return;
+            this.f(value, 0, this);
+            yield value;
+            yield* toGenerator(iter);
+        }
+    }
+    LazyList.LazyOnFirstList = LazyOnFirstList;
     /** Common functionalities of cached lists */
     class LazyAbstractCacheList extends LazySourceList {
         constructor() {

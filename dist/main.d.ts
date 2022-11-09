@@ -328,6 +328,11 @@ declare namespace LazyList {
         /** Outputs an iterable that will contain the current one as its only element */
         wrap(): LazyWrapList<T, this>;
         /**
+         * Like {@link but}, but the function is only executed on the first element
+         * @param f A function
+         */
+        onFirst(f: Convert<T, void, LazyOnFirstList<T>>): LazyOnFirstList<T>;
+        /**
          * Returns a {@link LazySet} that contains the elements of the list.
          * The set is lazy, this means that the elements are not calculated until it is checked if they are present.
          * WARNING: Having more than 1 active iterator at same time on the same {@link LazySet} could cause unexpected behaviours (Some elements could not be present)
@@ -876,6 +881,12 @@ declare namespace LazyList {
         constructor(source: TList);
         [Symbol.iterator](): Generator<Iterable<T>, void, unknown>;
         get fastCount(): number;
+    }
+    /** Output of {@link onFirst} */
+    class LazyOnFirstList<T> extends LazyFixedList<T> {
+        f: Convert<T, void, LazyOnFirstList<T>>;
+        constructor(source: Iterable<T>, f: Convert<T, void, LazyOnFirstList<T>>);
+        [Symbol.iterator](): Generator<any, void, unknown>;
     }
     /** Common functionalities of cached lists */
     abstract class LazyAbstractCacheList<I, O, TCache extends Iterable<O>> extends LazySourceList<I, O> {
