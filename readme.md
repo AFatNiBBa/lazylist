@@ -104,6 +104,7 @@ Methods that generate other `LazyList`s:
 - **`storeBy`**: Lazy version of `groupBy`, the groups cannot be iterated, only their elements can
 - (non lazy | unsafe) **`split`**: Groups the list's elements, `n` at a time or splits it according to a predicate; Passing `true` as the `lazy` argument will make the list lazy but unsafe
 - **`wrap`**: Outputs a `LazyList` that will contain the current one as its only element
+- **`onFirst`**: Like **`but`**, but the function is only executed on the first element
 - **`toSet`**: Returns a set that contains the elements of the current list
 - **`toMap`**: Returns a map that contains the elements of the current list
 - **`cache`**: Outputs a `LazyList` that will cache the calculated elements (To prevent them from passing inside the pipeline again)
