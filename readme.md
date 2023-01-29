@@ -11,11 +11,7 @@ document.head.append(Object.assign(document.createElement("script"), { src: "htt
 ```
 
 ## Usage
-You can both import the package like this...
-```js
-const from = require("lazylist.js");
-```
-...and like this
+You can import the package like this:
 ```js
 const { from } = require("lazylist.js");
 ```
