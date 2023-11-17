@@ -1,17 +1,10 @@
 {
-	"version" : "3.1.0",
-	"include": [ "./src/**/*.ts", "./src/**/*.js" ],
-	"compilerOptions" : {
-		"module": "CommonJS",
-		// "removeComments" : true,
-		"outDir" : "./dist",
-		"experimentalDecorators": true,
-		"baseUrl" : "./",
-		"sourceMap" : true,
-		"declaration" : true,
-		"strict": false,
-		"allowJs": true,
-		"target": "es2020",
-		"noImplicitUseStrict": true
-	}
+    "include": [ "src/**/*.ts" ],
+    "compilerOptions": {
+        "moduleResolution": "Bundler",
+        "strictFunctionTypes": false,
+        "noImplicitThis": true,
+        "target": "ESNext",
+        "strict": true,
+    }
 }
