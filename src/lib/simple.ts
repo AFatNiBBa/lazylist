@@ -42,9 +42,10 @@ export class MergeList<T> extends FixedList<T, T> {
     constructor(source: Iterable<T>, public other: Iterable<T>, public flip = false) { super(source); }
 
     *[Symbol.iterator]() {
-        if (!this.flip) return yield* this.source;
+        if (this.flip) return yield* this.other, yield* this.source;
+        const out = yield* this.source;
         yield* this.other;
-        if (this.flip) return yield* this.source;
+        return out;
     }
 
     get fastCount() {
