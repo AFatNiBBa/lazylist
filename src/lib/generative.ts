@@ -36,7 +36,8 @@ export class RangeList extends AbstractList<number> {
 
     /**
      * -
-     * Uses math to reverse the list lazily
+     * Uses math to reverse the list lazily.
+     * If the list has no finite length, it will throw a {@link RangeError}
      * @inheritdoc
      */
     reverse() {

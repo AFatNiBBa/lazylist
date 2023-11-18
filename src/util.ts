@@ -1,5 +1,5 @@
 
-import { Combine, Compare, Convert, Predicate } from ".";
+import { Combine, Compare, Convert, Predicate, fastCount } from ".";
 
 /** Base type of typed arrays */
 const TypedArray = Object.getPrototypeOf(Uint8Array) as typeof Array;
@@ -50,4 +50,14 @@ export function check<T>(source: Iterable<T>, dest: Iterable<T>) {
 export function checkLength(source: Iterable<number>, length = 3) {
     const temp = new Array(length).fill(undefined).map((_, i) => i + 1);
     check(source, temp);
+}
+
+/**
+ * Runs {@link checkLength} and checks the {@link fastCount} too
+ * @param source Sequence to check
+ * @param length Expected length
+ */
+export function checkLengthFastCount(source: Iterable<number>, length = 3) {
+    checkLength(source, length);
+    expect(fastCount(source)).toBe(length);
 }

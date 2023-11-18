@@ -1,14 +1,11 @@
 
 
 import linq from "..";
-import { check, checkLength } from "../util";
+import { check, checkLength, checkLengthFastCount } from "../util";
 
 const source = linq([ 1, 2, 3 ]);
 
-test("fixed", () => {
-    checkLength(source);
-    expect(source.fastCount).toBe(3);
-});
+test("fixed", () => checkLengthFastCount(source));
 
 test("wrap", () => {
     const list = source.wrap();
@@ -25,12 +22,12 @@ test("reverse - init", () => {
         .init(() => first++)
         .reverse();
     check(list, [ 3, 2, 1 ]);
-    expect(source.fastCount).toBe(3);
     expect(first).toBe(1);
 });
 
 test("merge", () => {
     const other = linq([ 4, 5, 6 ]);
-    checkLength(source.merge(other), 6);
+    const merged = source.merge(other);
+    checkLengthFastCount(merged, 6);
     check(source.merge(other, true), [ 4, 5, 6, 1, 2, 3 ]);
 });

@@ -16,13 +16,16 @@ export abstract class AbstractList<T> implements Iterable<T> {
     reverse(): AbstractList<T> { return new ReverseList(this); }
 
     /**
-     * Merges the current list to {@link other}
+     * Merges the current list to {@link other}.
+     * The iterator for this list returns the same thing the source returned
      * @param other An iterable
+     * @param flip If it's `true`, {@link other} will be yielded before the current list
      */
     merge(other: Iterable<T>, flip?: boolean) { return new MergeList(this, other, flip); }
 
     /**
      * Like {@link but}, but the function is only executed on the first element
+     * The iterator for this list returns the same thing the source returned
      * @param f A function
      */
     init(f: Convert<T, void, InitList<T>>) { return new InitList<T>(this, f); }
@@ -113,14 +116,15 @@ export abstract class AbstractList<T> implements Iterable<T> {
     flat() { return new FlatList<T>(this); }
 
     /**
-     * Inserts {@link value} at index {@link n}.
-     * If {@link n} is negative, the index will be calculated from the end of the list.
-     * If {@link n} is nullish, the value will be inserted AFTER the end of the list.
-     * If the insertion index is before the beginning of the list or more than 1 position after the end, it will throw a {@link RangeError}
-     * @param n Index at which to insert the value
+     * Inserts {@link value} at index {@link i}.
+     * If {@link i} is negative, the index will be calculated from the end of the list.
+     * If {@link i} is nullish, the value will be inserted AFTER the end of the list.
+     * If the insertion index is before the beginning of the list or more than 1 position after the end, it will throw a {@link RangeError}.
+     * The iterator for this list returns the same thing the source returned
+     * @param i Index at which to insert the value
      * @param value The value to insert
      */
-    insert(n: number | null, value: T) { return new InsertList(this, value, n); }
+    insert(i: number | null, value: T) { return new InsertList(this, value, i); }
 
     /**
      * Adds a value at the beginning of the list.
@@ -137,12 +141,21 @@ export abstract class AbstractList<T> implements Iterable<T> {
     append(value: T) { return new InsertList(this, value); }
 
     /**
+     * Removes the element at index {@link i}.
+     * If {@link i} is negative, the index will be calculated from the end of the list.
+     * If the index is before the beginning of the list or after the end, it will throw a {@link RangeError}.
+     * The iterator for this list returns the same thing the source returned
+     * @param i Index at which to remove the value
+     */
+    removeAt(i: number) { return new RemoveAtList(this, i); }
+
+    /**
      * Convertes the current list into a {@link Map}
      * @param k A conversion function that gets the key
      * @param v A conversion function that gets the value; If omitted, the whole element will be used as a value
      * @param throwOnDublicate If it's set to `true`, it throws a {@link RangeError} if a key is duplicate
      */
-    toMap<K, V = T>(k: Convert<T, K>, v: Convert<T, V> = IDENTITY, throwOnDublicate = false) {
+    toMap<K, V = T>(k: Convert<T, K, this>, v: Convert<T, V, this> = IDENTITY, throwOnDublicate = false) {
         var i = 0;
         const map = new Map<K, V>();
         for (const elm of this)
@@ -169,8 +182,8 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration)
      * @param f A combination function
      */
-    aggregate(f: Combine<T, T, T>): T;
-    aggregate<R>(out: R, f: Combine<R, T, R, AbstractList<T>>): R;
+    aggregate(f: Combine<T, T, T, this>): T;
+    aggregate<R>(out: R, f: Combine<R, T, R, this>): R;
     aggregate(out: T | Combine<T, T, T>, f?: Combine<T, T, T>): T {
         var i = 0;
         for (const elm of this)
@@ -188,27 +201,27 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * Returns the biggest value in the list
      * @param comp A sorting function
      */
-    max(comp: Compare<T> = COMPARE) { return this.aggregate((a, b, i, list) => comp(a, b, i, list) > 0 ? a : b); }
+    max(comp: Compare<T, this> = COMPARE) { return this.aggregate((a, b, i, list) => comp(a, b, i, list) > 0 ? a : b); }
 
     /**
      * Returns the element of the list with which {@link f} has returned the biggest value
      * @param f A conversion function
      * @param comp A sorting function
      */
-    maxBy<R>(f: Convert<T, R>, comp?: Compare<R, AbstractList<T>>) { return this.max(by<T, R>(f, comp)); }
+    maxBy<R>(f: Convert<T, R, this>, comp?: Compare<R, this>) { return this.max(by<T, R>(f, comp)); }
 
     /**
      * Returns the smaller value in the list
      * @param comp A sorting function
      */
-    min(comp: Compare<T> = COMPARE) { return this.max((a, b, i, list) => -comp(a, b, i, list)); }
+    min(comp: Compare<T, this> = COMPARE) { return this.max((a, b, i, list) => -comp(a, b, i, list)); }
 
     /**
      * Returns the element of the list with which {@link f} has returned the smallest value
      * @param f A conversion function
      * @param comp A sorting function
      */
-    minBy<R>(f: Convert<T, R>, comp?: Compare<R, AbstractList<T>>) { return this.min(by<T, R>(f, comp)); }
+    minBy<R>(f: Convert<T, R, this>, comp?: Compare<R, this>) { return this.min(by<T, R>(f, comp)); }
 
     /** Returns the length of the iterable if it is easy to compute, otherwise it returns {@link NOT_FOUND} */
     get fastCount() { return NOT_FOUND; }
@@ -219,12 +232,13 @@ export abstract class AbstractList<T> implements Iterable<T> {
 
 /**
  * Instances of this class are guaranteed to be the modification of an other iterable.
- * The input iterable's elements are of type {@link I} and the output's ones are of type {@link O}
+ * The input iterable's elements are of type {@link I} and the output's ones are of type {@link O}.
+ * The iterator for this list returns the same thing {@link source} returned
  */
 export abstract class SourceList<I, O> extends AbstractList<O> {
     constructor(public source: Iterable<I>) { super(); }
 
-    *[Symbol.iterator](): Generator<O> { yield* <any>this.source; }
+    *[Symbol.iterator](): Generator<O> { return yield* <any>this.source; }
 
     /** Obtains the calculated version of {@link source} */
     protected $sourceAsArray() { return hasLength(this.source) ? this.source : [ ...this.source ]; }
@@ -239,13 +253,25 @@ export abstract class SourceList<I, O> extends AbstractList<O> {
         const temp = this.$sourceAsArray();
         return [ temp, temp.length ];
     }
+
+    /**
+     * Returns an iterable containing the elements of {@link source} and the absolute value of {@link i}, which can be negative.
+     * It will use {@link $calcLength} to calculate the length if the index is negative
+     * @param i The index to make absolute
+     */
+    protected $calcIndex(i: number) {
+        if (i >= 0) return [ this.source, i ] as const;
+        const out = this.$calcLength();
+        out[1] += i;
+        return out;
+    }
 }
 
 // These are needed to be imported AFTER the definition of "AbstractList", because it is needed IMMEDIATELY by all of them
 import { CaseList, DistinctList, ExceptList, WhereList } from "./where";
 import { SelectList, SelectManyList, SelectWhereList } from "./select";
 import { InitList, MergeList, ReverseList, WrapList } from "./simple";
+import { InsertList, RemoveAtList } from "./element";
 import { FlatList, TraverseList } from "./tree";
-import { InsertList } from "./element";
 import { TakeList } from "./take";
 import { SkipList } from "./skip";

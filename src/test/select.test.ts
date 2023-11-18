@@ -1,11 +1,10 @@
 
 import linq from "..";
-import { checkLength } from "../util";
+import { checkLength, checkLengthFastCount } from "../util";
 
 test("select", () => {
     const source = linq([ 2, 3, 4 ]).select(x => x - 1);
-    checkLength(source);
-    expect(source.fastCount).toBe(3);
+    checkLengthFastCount(source);
 });
 
 test("selectMany", () => {

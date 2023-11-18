@@ -16,8 +16,7 @@ export class InsertList<T> extends FixedList<T, T> {
             return out;
         }
 
-        const [ list, l ] = this.i < 0 ? this.$calcLength() : [ this.source, 0 ];
-        const i = l + this.i;
+        const [ list, i ] = this.$calcIndex(this.i);
         if (i < 0) throw new RangeError("It's not possible to insert an element before the beginning of the original sequence");
 
         const iter = list[Symbol.iterator]();
@@ -34,6 +33,31 @@ export class InsertList<T> extends FixedList<T, T> {
             ? this.i == null || !(this.i < 0 ? temp + this.i < 0 : this.i > temp)
                 ? temp + 1
                 : NOT_FOUND // Casi d'errore
+            : NOT_FOUND;
+    }
+}
+
+/** Output of {@link removeAt} */
+export class RemoveAtList<T> extends FixedList<T, T> {
+    constructor (source: Iterable<T>, public i: number) { super(source); }
+
+    *[Symbol.iterator]() {
+        const [ list, i ] = this.$calcIndex(this.i);
+        if (i < 0) throw new RangeError("It's not possible to remove an element before the beginning of the original sequence");
+
+        const iter = list[Symbol.iterator]();
+        const taken = yield* TakeList.take(iter, i);
+        if (taken !== i || iter.next().done) throw new RangeError("It's not possible to remove an element after the end of the original sequence");
+
+        return yield* toGenerator(iter);
+    }
+
+    get fastCount() {
+        const temp = super.fastCount;
+        return ~temp
+            ? (this.i < 0 ? temp + this.i < 0 : this.i >= temp)
+                ? NOT_FOUND // Casi d'errore
+                : temp - 1
             : NOT_FOUND;
     }
 }
