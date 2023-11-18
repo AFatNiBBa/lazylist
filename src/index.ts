@@ -1,6 +1,6 @@
 
 import { EmptyList, RandList, RangeList } from "./lib/generative";
-import { NOT_FOUND, hasLength } from "./util";
+import { COMPARE, NOT_FOUND, hasLength } from "./util";
 import { AbstractList } from "./lib/abstract";
 import { FixedList } from "./lib/simple";
 
@@ -11,6 +11,12 @@ export type Convert<I, O, TList = AbstractList<I>> = (x: I, i: number, list: TLi
 
 /** A function that checks if a condition applies to a value */
 export type Predicate<T, TList = AbstractList<T>> = Convert<T, boolean, TList>;
+
+/** A function that takes two arguments and combines them */
+export type Combine<A, B, R, TList = AbstractList<R>> = (a: A, b: B, i: number, list: TList) => R;
+
+/** A function that compares two values and returns a positive number if the first is greater than the second, 0 if they're equals and a negative value otherwise */
+export type Compare<T, TList = AbstractList<T>> = Combine<T, T, number, TList>;
 
 /** Indicates how two iterable should be conbined it they have different sizes */
 export enum JoinMode {
@@ -65,17 +71,21 @@ export function fastCount(source?: Iterable<any> | null): number {
 /**
  * Makes the provided iterator iterable
  * @param iter The iterator to make iterable
- * @param dispose If `true` the generator will be closed even if you don't finish iterating it
+ * @param next The first value to pass as next
  */
-export function *toGenerator<T, R>(iter: Iterator<T, R>, dispose = true) {
-    try {
-        for (var value: T | R; !({ value } = iter.next()).done; )
-            yield <T>value;
-    }
-    finally {
-        if (dispose)
-            return <R>iter.return?.().value;
-    }
+export function *toGenerator<T, R = any, N = unknown>(iter: Iterator<T, R, N>, next?: N) {
+    for (var value: T | R; !({ value } = iter.next(next!)).done; )
+        next = yield <T>value;
+    return <R>value;
+}
+
+/**
+ * Applies a {@link Convert} to a {@link Compare}
+ * @param f A conversion function
+ * @param comp A sorting function
+ */
+export function by<I, O>(f: Convert<I, O>, comp: Compare<O, AbstractList<I>> = COMPARE): Compare<I> {
+    return (a, b, i, list) => comp(f(a, i, list), f(b, i, list), i, list);
 }
 
 /** A sequence with 0 elements */

@@ -1,6 +1,6 @@
 
-import { Convert, JoinMode, Predicate, fastCount } from "..";
-import { IDENTITY, NOT_FOUND, hasLength } from "../util";
+import { Combine, Compare, Convert, JoinMode, Predicate, by, fastCount } from "..";
+import { COMPARE, IDENTITY, NOT_FOUND, hasLength } from "../util";
 
 /** An iterable wrapper with helper functions */
 export abstract class AbstractList<T> implements Iterable<T> {
@@ -162,6 +162,53 @@ export abstract class AbstractList<T> implements Iterable<T> {
                 throw new RangeError("Duplicates are not allowed in this set");
         return set;
     }
+
+    /**
+     * Aggregates the list based on {@link f}.
+     * If {@link out} is not provided and the sequence is empty, it throws a {@link RangeError}
+     * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration)
+     * @param f A combination function
+     */
+    aggregate(f: Combine<T, T, T>): T;
+    aggregate<R>(out: R, f: Combine<R, T, R, AbstractList<T>>): R;
+    aggregate(out: T | Combine<T, T, T>, f?: Combine<T, T, T>): T {
+        var i = 0;
+        for (const elm of this)
+            if (f)
+                out = f(<T>out, elm, i++, this);
+            else
+                f = out as Combine<T, T, T>,
+                out = elm,
+                i++;
+        if (f) return <T>out;
+        throw new RangeError("Can't aggregate an empty sequence");
+    }
+
+    /**
+     * Returns the biggest value in the list
+     * @param comp A sorting function
+     */
+    max(comp: Compare<T> = COMPARE) { return this.aggregate((a, b, i, list) => comp(a, b, i, list) > 0 ? a : b); }
+
+    /**
+     * Returns the element of the list with which {@link f} has returned the biggest value
+     * @param f A conversion function
+     * @param comp A sorting function
+     */
+    maxBy<R>(f: Convert<T, R>, comp?: Compare<R, AbstractList<T>>) { return this.max(by<T, R>(f, comp)); }
+
+    /**
+     * Returns the smaller value in the list
+     * @param comp A sorting function
+     */
+    min(comp: Compare<T> = COMPARE) { return this.max((a, b, i, list) => -comp(a, b, i, list)); }
+
+    /**
+     * Returns the element of the list with which {@link f} has returned the smallest value
+     * @param f A conversion function
+     * @param comp A sorting function
+     */
+    minBy<R>(f: Convert<T, R>, comp?: Compare<R, AbstractList<T>>) { return this.min(by<T, R>(f, comp)); }
 
     /** Returns the length of the iterable if it is easy to compute, otherwise it returns {@link NOT_FOUND} */
     get fastCount() { return NOT_FOUND; }

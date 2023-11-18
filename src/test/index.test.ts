@@ -3,7 +3,7 @@ import linq, { fastCount, toGenerator } from "..";
 import { NOT_FOUND, checkLength } from "../util";
 import { AbstractList } from "../lib/abstract";
 
-test("from", () => {
+test("linq", () => {
     function *iter() {
         yield 1;
         yield 2;
@@ -36,14 +36,9 @@ test("fastCount", () => {
 
 test("toGenerator", () => {
     var i = 0;
-    var ok = false;
-    const iter: Iterator<number> = {
-        return: () => ({ value: undefined, done: ok = true }),
+    checkLength(toGenerator<number>({
         next: () => i < 3
             ? { value: i++ + 1, done: false }
             : { value: undefined, done: true }
-    };
-
-    checkLength(toGenerator(iter));
-    expect(ok).toBe(true);
+    }));
 });

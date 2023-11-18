@@ -11,8 +11,7 @@
   "scripts": {
     "build": "vite build",
     "test": "cls && jest",
-    "save": "npm run build && npm publish",
-    "start": "npm run test -- --watchAll"
+    "save": "npm run build && npm publish"
   },
   "keywords": [
     "ienumerable",

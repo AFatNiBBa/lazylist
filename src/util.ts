@@ -1,4 +1,6 @@
 
+import { Combine, Compare, Convert, Predicate } from ".";
+
 /** Base type of typed arrays */
 const TypedArray = Object.getPrototypeOf(Uint8Array) as typeof Array;
 
@@ -11,11 +13,17 @@ export type MarkedIterator<T> = Iterator<T> & { done?: boolean };
 /** Value returned when it has been impossible to get a numeric result */
 export const NOT_FOUND = -1;
 
-/** A function that returns always `true`; Used as default */
+/** The default {@link Predicate}: Returns always `true` */
 export const TRUE = () => true;
 
-/** A function that returns its input; Used as default */
+/** The default {@link Convert}: The identity function */
 export const IDENTITY = (x: any) => x;
+
+/** The default {@link Combine}: Creates a tuple */
+export const TUPLE = (a: any, b: any) => <any>[ a, b ];
+
+/** The default {@link Compare}: Uses the `<` and `>` operators */
+export const COMPARE = (a: any, b: any) => a > b ? 1 : a < b ? -1 : 0;
 
 /**
  * Gets if the provided value has an usable length property
