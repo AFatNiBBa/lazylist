@@ -6,6 +6,7 @@ test("where", () => {
     const source = linq([ 1, 2, 4, 5, 3 ]);
     checkLength(source.where(x => x <= 3));
     checkLength(source.where((x, i) => x !== 4 && i !== 3));
+    checkLength(source.where(x => x === 1).or(x => x === 2).or(x => x === 3));
     check(linq([ true, false, true ]).where(), [ true, true ]);
 });
 
@@ -19,6 +20,7 @@ test("ofType", () => {
     check(source.ofType(A), [ a, b ]);
     check(source.ofType(B), [ b ]);
     check(source.ofType(C), [ c ]);
+    check(source.ofType(C).or(x => x instanceof B), [ b, c ], false);
 });
 
 test("case", () => {

@@ -13,6 +13,12 @@ export class WhereList<T> extends SourceList<T, T> {
             if (this.p(elm, i++, this))
                 yield elm;
     }
+
+    /**
+     * Allows you to split the OR conditions of a {@link where} into multiple istructions
+     * @param p A predicate function
+     */
+    or(p: Predicate<T, WhereList<T>>) { return new WhereList(this.source, (x, i, list) => this.p(x, i, list) || p(x, i, list)); }
 }
 
 /** Output of {@link case} */

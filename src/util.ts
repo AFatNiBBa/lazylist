@@ -1,5 +1,5 @@
 
-import { Combine, Compare, Convert, Predicate, fastCount } from ".";
+import linq, { Combine, Compare, Convert, JoinMode, Predicate, fastCount } from ".";
 
 /** Base type of typed arrays */
 const TypedArray = Object.getPrototypeOf(Uint8Array) as typeof Array;
@@ -37,9 +37,13 @@ export function hasLength<T>(source: Iterable<T>): source is readonly T[] {
  * Checks if the sequence returned by {@link source} is equal to the one returned by {@link dest}
  * @param source Sequence to check
  * @param dest The sequence to use as reference
+ * @param structural If `true` it compares the JSON representation of the elements of {@link source} and {@link dest}, otherwise it checks by reference
  */
-export function check<T>(source: Iterable<T>, dest: Iterable<T>) {
-    expect(JSON.stringify([ ...source ])).toBe(JSON.stringify([ ...dest ]));
+export function check<T>(source: Iterable<T>, dest: Iterable<T>, structural = true) {
+    if (structural) expect(JSON.stringify([ ...source ])).toBe(JSON.stringify([ ...dest ]));
+    else linq(source)
+        .zip(dest, (a, b) => expect(a).toBe(b), JoinMode.outer)
+        .forEach();
 }
 
 /**
