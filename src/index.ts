@@ -92,11 +92,11 @@ export function by<I, O>(f: Convert<I, O>, comp: Compare<O, AbstractList<I>> = C
 linq.empty = EmptyList.instance;
 
 /**
- * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}.
+ * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}, both included.
  * Since the sequence is infinite, it will create problems with non lazy methods.
  * Since the sequence is random, it will not be the same every time you calculate it
- * @param top The highest number in the sequence; If not provided, it will be `1` and the random numbers wont neither be integers or bounded by {@link bottom}
- * @param bottom The lowest number in the sequence; If not provided, it will be `0`
+ * @param top The highest number in the sequence; If not provided, it will be 1 and the random numbers wont neither be integers, 1 nor bounded by {@link bottom}
+ * @param bottom The lowest number in the sequence; If not provided, it will be 0
  */
 linq.rand = (top?: number, bottom?: number) => new RandList(top, bottom);
 

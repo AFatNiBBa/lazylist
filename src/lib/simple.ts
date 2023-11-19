@@ -1,7 +1,7 @@
 
 import linq, { Convert, fastCount, toGenerator } from "..";
 import { SourceList } from "./abstract";
-import { NOT_FOUND } from "../util";
+import { RandList } from "./generative";
 
 /**
  * Output of {@link linq}.
@@ -28,6 +28,33 @@ export class WrapList<T, TList extends Iterable<T>> extends SourceList<T, TList>
     get fastCount() { return 1; }
 }
 
+/** Output of {@link default} */
+export class DefaultList<T> extends FixedList<T, T> {
+    constructor (source: Iterable<T>, public def?: T) { super(source); }
+
+    *[Symbol.iterator]() {
+        var value: T;
+        const iter = this.source[Symbol.iterator]();
+        if (({ value } = iter.next()).done) return yield this.def!, <any>value;
+        else yield value;
+        return yield* toGenerator(iter);
+    }
+
+    get fastCount() { return super.fastCount || 1; }
+}
+
+/** Output of {@link repeat} */
+export class RepeatList<T> extends FixedList<T, T> {
+    constructor (source: Iterable<T>, public n: number) { super(source); }
+
+    *[Symbol.iterator]() {
+        for (var i = 0; i < this.n; i++)
+            yield* this.source;
+    }
+
+    get fastCount() { return super.fastCount * Math.max(0, this.n); }
+}
+
 /** Output of {@link reverse} */
 export class ReverseList<T> extends FixedList<T, T> {
     *[Symbol.iterator]() {
@@ -37,22 +64,15 @@ export class ReverseList<T> extends FixedList<T, T> {
     }
 }
 
-/** Output of {@link merge} */
-export class MergeList<T> extends FixedList<T, T> {
-    constructor(source: Iterable<T>, public other: Iterable<T>, public flip = false) { super(source); }
-
+/** Output of {@link shuffle} */
+export class ShuffleList<T> extends FixedList<T, T> {
     *[Symbol.iterator]() {
-        if (this.flip) return yield* this.other, yield* this.source;
-        const out = yield* this.source;
-        yield* this.other;
-        return out;
-    }
-
-    get fastCount() {
-        const first = super.fastCount;
-        if (!~first) return NOT_FOUND;
-        const second = fastCount(this.other);
-        return ~second ? first + second : NOT_FOUND;
+        const temp = [ ...this.source ]; // A new array must be created since we're going change the elements
+        for (var i = 0; i < temp.length; i++) {
+            const k = RandList.rand(temp.length, i);
+            yield temp[k];
+            temp[k] = temp[i];
+        }
     }
 }
 
@@ -69,4 +89,18 @@ export class InitList<T> extends FixedList<T> {
         yield value;
         return yield* toGenerator(iter);
     }
+}
+
+/** Output of {@link merge} */
+export class MergeList<T> extends FixedList<T, T> {
+    constructor(source: Iterable<T>, public other: Iterable<T>, public flip = false) { super(source); }
+
+    *[Symbol.iterator]() {
+        if (this.flip) return yield* this.other, yield* this.source;
+        const out = yield* this.source;
+        yield* this.other;
+        return out;
+    }
+
+    get fastCount() { return super.fastCount + fastCount(this.other); }
 }

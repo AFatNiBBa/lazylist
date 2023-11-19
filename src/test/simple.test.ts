@@ -1,7 +1,7 @@
 
 
 import linq from "..";
-import { check, checkLength, checkLengthFastCount } from "../util";
+import { check, checkLengthFastCount } from "../util";
 
 const source = linq([ 1, 2, 3 ]);
 
@@ -16,6 +16,15 @@ test("wrap", () => {
     expect(list.reverse()).toBe(list);
 });
 
+test("default", () => {
+    checkLengthFastCount(source.default(12));
+    checkLengthFastCount(linq([ 1,2 ]).removeAt(0).removeAt(0).default(12).select(x => x - 11), 1);
+});
+
+test("repeat", () => {
+    checkLengthFastCount(source.repeat(2).select((x, i) => i >= 3 ? x + 3 : x), 6);
+});
+
 test("reverse - init", () => {
     var first = 0;
     const list = source
@@ -23,6 +32,14 @@ test("reverse - init", () => {
         .reverse();
     check(list, [ 3, 2, 1 ]);
     expect(first).toBe(1);
+});
+
+test("shuffle", () => {
+    const source = linq
+        .range(9, 1)
+        .shuffle()
+        .order();
+    checkLengthFastCount(source, 9);
 });
 
 test("merge", () => {

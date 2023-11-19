@@ -29,11 +29,9 @@ export class InsertList<T> extends FixedList<T, T> {
 
     get fastCount() {
         const temp = super.fastCount;
-        return ~temp
-            ? this.i == null || !(this.i < 0 ? temp + this.i < 0 : this.i > temp)
-                ? temp + 1
-                : NOT_FOUND // Casi d'errore
-            : NOT_FOUND;
+        return this.i == null || !(this.i < 0 ? temp + this.i < 0 : this.i > temp)
+            ? temp + 1
+            : NOT_FOUND; // Casi d'errore
     }
 }
 
@@ -54,10 +52,8 @@ export class RemoveAtList<T> extends FixedList<T, T> {
 
     get fastCount() {
         const temp = super.fastCount;
-        return ~temp
-            ? (this.i < 0 ? temp + this.i < 0 : this.i >= temp)
-                ? NOT_FOUND // Casi d'errore
-                : temp - 1
-            : NOT_FOUND;
+        return (this.i < 0 ? temp + this.i < 0 : this.i >= temp)
+            ? NOT_FOUND // Casi d'errore
+            : temp - 1;
     }
 }

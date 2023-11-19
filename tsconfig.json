@@ -5,6 +5,6 @@
         "strictFunctionTypes": false,
         "noImplicitThis": true,
         "target": "ESNext",
-        "strict": true,
+        "strict": true
     }
 }

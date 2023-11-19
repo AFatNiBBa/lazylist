@@ -2,11 +2,11 @@
   "name": "lazylist.js",
   "version": "5.0.0",
   "description": "Data structures that compute their elements only when needed",
-  "types": "./dist/model.d.ts",
+  "types": "./dist/lazylist.d.ts",
   "exports": {
-    "require": "./dist/model.umd.js",
-    "import": "./dist/model.mjs",
-    "types": "./dist/model.d.ts"
+    "require": "./dist/lazylist.umd.js",
+    "import": "./dist/lazylist.mjs",
+    "types": "./dist/lazylist.d.ts"
   },
   "scripts": {
     "build": "vite build",

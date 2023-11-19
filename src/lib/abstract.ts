@@ -10,10 +10,37 @@ export abstract class AbstractList<T> implements Iterable<T> {
     wrap() { return new WrapList<T, this>(this); }
 
     /**
+     * Forces the list to have at least one element by adding a default value if the list is empty
+     * @param def The value to add if the list is empty
+     */
+    default(def?: T) { return new DefaultList(this, def); }
+
+    /**
+     * Repeat the list's elements {@link n} times.
+     * The list is calculated each time.
+     * Use the {@link cache} method to cache the elements
+     * @param n The number of repetitions
+     */
+    repeat(n: number) { return new RepeatList(this, n); }
+
+    /**
      * Reverses the list.
      * Non lazy
      */
     reverse(): AbstractList<T> { return new ReverseList(this); }
+
+    /**
+     * Shuffles the list in a randomic way.
+     * Non lazy
+     */
+    shuffle() { return new ShuffleList(this); }
+
+    /**
+     * Like {@link but}, but the function is only executed on the first element
+     * The iterator for this list returns the same thing the source returned
+     * @param f A function
+     */
+    init(f: Convert<T, void, InitList<T>>) { return new InitList<T>(this, f); }
 
     /**
      * Merges the current list to {@link other}.
@@ -22,13 +49,14 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param flip If it's `true`, {@link other} will be yielded before the current list
      */
     merge(other: Iterable<T>, flip?: boolean) { return new MergeList(this, other, flip); }
-
+    
     /**
-     * Like {@link but}, but the function is only executed on the first element
-     * The iterator for this list returns the same thing the source returned
-     * @param f A function
+     * Combines the current list with {@link other} based on {@link f}
+     * @param other An iterable
+     * @param f A combination function, if not provided the pairs will be put in a tuple
+     * @param mode Different length handling
      */
-    init(f: Convert<T, void, InitList<T>>) { return new InitList<T>(this, f); }
+    zip<O, R = [ T, O ]>(other: Iterable<O>, f?: Combine<T, O, R, ZipList<T, O, R>>, mode?: JoinMode) { return new ZipList<T, O, R>(this, other, f, mode); }
 
     /**
      * Converts the list based on {@link f}
@@ -77,14 +105,14 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * Ensures every element of the list shows up only once
      * @param f A conversion function that returns the the part of the element to check duplicates for; If omitted, the element itself will be used
      */
-    distinct<TKey = T>(f?: Convert<T, TKey, DistinctList<T, TKey>>) { return new DistinctList<T, TKey>(this, f); }
+    distinct<K = T>(f?: Convert<T, K, DistinctList<T, K>>) { return new DistinctList<T, K>(this, f); }
 
     /**
      * Ensures no element of {@link other} shows up in the list.
      * Every time the iteration starts, {@link other} is completely calculated
      * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
      */
-    except<TKey = T>(other: Iterable<TKey>, f?: Convert<T, TKey, ExceptList<T, TKey>>) { return new ExceptList<T, TKey>(this, other, f); }
+    except<K = T>(other: Iterable<K>, f?: Convert<T, K, ExceptList<T, K>>) { return new ExceptList<T, K>(this, other, f); }
 
     /**
      * Takes the first {@link p} elements of the list and skips the rest
@@ -114,6 +142,27 @@ export abstract class AbstractList<T> implements Iterable<T> {
 
     /** Flattens recursively every iterable element of the list */
     flat() { return new FlatList<T>(this); }
+
+    /**
+     * Sorts the current list.
+     * If multiple sorts are done in a row, they will be computed all at once.
+     * The current index is {@link NOT_FOUND}.
+     * Non lazy
+     * @param desc If `true`, reverses the results
+     * @param comp A sorting function
+     */
+    order(desc?: boolean, comp?: Compare<T, OrderList<T>>) { return new OrderList<T>(this, desc, comp); }
+
+    /**
+     * Sorts the current list based on the value returned by {@link f} for each element of the current list.
+     * If multiple sorts are done in a row, they will be computed all at once.
+     * The current index is {@link NOT_FOUND}.
+     * Non lazy
+     * @param f A conversion function
+     * @param comp A sorting function
+     * @param desc If `true`, reverses the results
+     */
+    orderBy<K>(f: Convert<T, K, OrderList<T>>, desc?: boolean, comp?: Compare<K, OrderList<T>>): OrderList<T> { return this.order(desc, by(f, comp)); }
 
     /**
      * Inserts {@link value} at index {@link i}.
@@ -208,7 +257,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param f A conversion function
      * @param comp A sorting function
      */
-    maxBy<R>(f: Convert<T, R, this>, comp?: Compare<R, this>) { return this.max(by<T, R>(f, comp)); }
+    maxBy<K>(f: Convert<T, K, this>, comp?: Compare<K, this>): T { return this.max(by(f, comp)); }
 
     /**
      * Returns the smaller value in the list
@@ -221,7 +270,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param f A conversion function
      * @param comp A sorting function
      */
-    minBy<R>(f: Convert<T, R, this>, comp?: Compare<R, this>) { return this.min(by<T, R>(f, comp)); }
+    minBy<K>(f: Convert<T, K, this>, comp?: Compare<K, this>): T { return this.min(by(f, comp)); }
 
     /** Returns the length of the iterable if it is easy to compute, otherwise it returns {@link NOT_FOUND} */
     get fastCount() { return NOT_FOUND; }
@@ -268,10 +317,12 @@ export abstract class SourceList<I, O> extends AbstractList<O> {
 }
 
 // These are needed to be imported AFTER the definition of "AbstractList", because it is needed IMMEDIATELY by all of them
+import { DefaultList, InitList, MergeList, RepeatList, ReverseList, ShuffleList, WrapList } from "./simple";
 import { CaseList, DistinctList, ExceptList, WhereList } from "./where";
 import { SelectList, SelectManyList, SelectWhereList } from "./select";
-import { InitList, MergeList, ReverseList, WrapList } from "./simple";
 import { InsertList, RemoveAtList } from "./element";
 import { FlatList, TraverseList } from "./tree";
+import { OrderList } from "./order";
 import { TakeList } from "./take";
-import { SkipList } from "./skip";
+import { SkipList } from "./skip";import { ZipList } from "./zip";
+

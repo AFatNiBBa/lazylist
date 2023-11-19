@@ -11,7 +11,7 @@ const TypedArray = Object.getPrototypeOf(Uint8Array) as typeof Array;
 export type MarkedIterator<T> = Iterator<T> & { done?: boolean };
 
 /** Value returned when it has been impossible to get a numeric result */
-export const NOT_FOUND = -1;
+export const NOT_FOUND = NaN;
 
 /** The default {@link Predicate}: Returns always `true` */
 export const TRUE = () => true;

@@ -71,10 +71,8 @@ export class TakeList<T> extends FixedList<T, T> {
             return n; // The value of "this.padEnd" has no meaning when "this.leftOnNegative" is `true`
 
         const temp = super.fastCount;
-        return ~temp
-            ? this.p >= 0 || !this.leftOnNegative
-                ? Math.min(temp, n)
-                : Math.max(0, temp - n)
-            : NOT_FOUND;
+        return this.p >= 0 || !this.leftOnNegative
+            ? Math.min(temp, n)
+            : Math.max(0, temp - n);
     }
 }
