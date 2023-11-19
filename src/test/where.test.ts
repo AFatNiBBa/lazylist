@@ -43,10 +43,12 @@ test("distinct", () => {
     checkLength(wrapped.distinct(x => x.x).select(x => x.x));
 });
 
-test("except", () => {
+test("intersect - except", () => {
     const list = [ 4, 5, 5, 6 ];
     const source = linq([ 1, 4, 6, 2, 3, 5 ]);
-    checkLength(source.except(list));
     const wrapped = source.select(x => ({ x }));
+    check(source.intersect(list), [ 4, 6, 5 ]);
+    check(wrapped.intersect(list, x => x.x).select(x => x.x), [ 4, 6, 5 ]);
+    checkLength(source.except(list));
     checkLength(wrapped.except(list, x => x.x).select(x => x.x));
 });

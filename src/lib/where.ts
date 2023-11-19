@@ -48,15 +48,15 @@ export class DistinctList<T, K = T> extends SourceList<T, T> {
     }
 }
 
-/** Output of {@link except} */
-export class ExceptList<T, K = T> extends SourceList<T, T> {
-    constructor (source: Iterable<T>, public other: Iterable<K>, public f: Convert<T, K, ExceptList<T, K>> = IDENTITY) { super(source); }
+/** Output of {@link intersect} */
+export class IntersectList<T, K = T> extends SourceList<T, T> {
+    constructor (source: Iterable<T>, public other: Iterable<K>, public f: Convert<T, K, IntersectList<T, K>> = IDENTITY, public negate = false) { super(source); }
 
     *[Symbol.iterator]() {
         var i = 0;
         const set = new Set<K>(this.other);
         for (const elm of this.source)
-            if (!set.has(this.f(elm, i++, this)))
+            if (set.has(this.f(elm, i++, this)) !== this.negate)
                 yield elm;
     }
 }

@@ -132,11 +132,18 @@ export abstract class AbstractList<T> implements Iterable<T> {
     distinct<K = T>(f?: Convert<T, K, DistinctList<T, K>>) { return new DistinctList<T, K>(this, f); }
 
     /**
+     * Ensures only elements of {@link other} show up in the list.
+     * Every time the iteration starts, {@link other} is completely calculated
+     * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
+     */
+    intersect<K = T>(other: Iterable<K>, f?: Convert<T, K, IntersectList<T, K>>) { return new IntersectList<T, K>(this, other, f); }
+
+    /**
      * Ensures no element of {@link other} shows up in the list.
      * Every time the iteration starts, {@link other} is completely calculated
      * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
      */
-    except<K = T>(other: Iterable<K>, f?: Convert<T, K, ExceptList<T, K>>) { return new ExceptList<T, K>(this, other, f); }
+    except<K = T>(other: Iterable<K>, f?: Convert<T, K, IntersectList<T, K>>) { return new IntersectList<T, K>(this, other, f, true); }
 
     /**
      * Takes the first {@link p} elements of the list and skips the rest
@@ -399,7 +406,7 @@ export abstract class SourceList<I, O> extends AbstractList<O> {
 
 // These are needed to be imported AFTER the definition of "AbstractList", because it is needed IMMEDIATELY by all of them
 import { DefaultList, FinallyList, FixedList, InitList, MergeList, OnceList, RepeatList, ReverseList, ShuffleList, WrapList } from "./simple";
-import { CaseList, DistinctList, ExceptList, WhereList } from "./where";
+import { CaseList, DistinctList, IntersectList, WhereList } from "./where";
 import { SelectList, SelectManyList, SelectWhereList } from "./select";
 import { InsertList, RemoveAtList } from "./element";
 import { FlatList, TraverseList } from "./tree";
