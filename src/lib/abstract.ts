@@ -243,16 +243,22 @@ export abstract class AbstractList<T> implements Iterable<T> {
     removeAt(i: number) { return new RemoveAtList(this, i); }
 
     /**
-     * Passes `this` to {@link f} and then passes the return value to a new {@link FixedList}
-     * @param f A conversion function
+     * Caches the iterator element one by one before they're yielded.
+     * Used to prevent multiple enumeration
      */
-    pipe<R>(f: (x: this) => Iterable<R>) { return new FixedList(f(this)); }
+    cache(): AbstractList<T> { return new CacheList(this); }
 
     /**
      * Calculates each element of the list and wraps them in a {@link FixedList}
      * (Non lazy)
      */
     calc(): AbstractList<T> { return new FixedList(this.value); }
+
+    /**
+     * Passes `this` to {@link f} and then passes the return value to a new {@link FixedList}
+     * @param f A conversion function
+     */
+    pipe<R>(f: (x: this) => Iterable<R>) { return new FixedList(f(this)); }
 
     /**
      * Replaces every element of the list with the same exact value
@@ -365,6 +371,9 @@ export abstract class AbstractList<T> implements Iterable<T> {
 
     /** Calculates each element of the list and puts them inside of an {@link Array} */
     get value() { return [ ...this ]; }
+
+    /** Gets the first element of the list */
+    get first() { for (const elm of this) return elm; }
 }
 
 /**
@@ -411,6 +420,7 @@ import { SelectList, SelectManyList, SelectWhereList } from "./select";
 import { InsertList, RemoveAtList } from "./element";
 import { FlatList, TraverseList } from "./tree";
 import { OrderList } from "./order";
+import { CacheList } from "./cache";
 import { TakeList } from "./take";
 import { SkipList } from "./skip";
 import { ZipList } from "./zip";

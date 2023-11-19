@@ -12,13 +12,13 @@ test("await", async () => {
     checkLengthFastCount(temp);
 });
 
-test("pipe", () => check(linq([ 8, 9, 10 ]).pipe(x => x.value.sort()), [ 10, 8, 9 ]));
-
 test("calc", () => {
     const temp = source.where(TRUE);
     expect(temp.fastCount).toBe(NOT_FOUND);
     expect(temp.calc().fastCount).toBe(3);
 });
+
+test("pipe", () => check(linq([ 8, 9, 10 ]).pipe(x => x.value.sort()), [ 10, 8, 9 ]));
 
 test("fill", () => {
     const obj = {};
@@ -123,4 +123,21 @@ test("min", () => {
 test("minBy", () => {
     expect(wrapped.minBy(x => x.x).x).toBe(1);
     expect(wrapped.minBy(x => x.x, (a, b) => b - a).x).toBe(3);
+});
+
+test("first", () => {
+    var first = false, second = false;
+    function *two() {
+        try
+        {
+            yield 1;
+            second = true;
+            yield 2;
+        }
+        finally { first = true; }
+    }
+
+    expect(linq(two).first).toBe(1);
+    expect(first).toBe(true);
+    expect(second).toBe(false);
 });
