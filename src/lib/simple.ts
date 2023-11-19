@@ -91,6 +91,27 @@ export class InitList<T> extends FixedList<T> {
     }
 }
 
+/** Output of {@link finally} */
+export class FinallyList<T> extends FixedList<T, T> {
+    constructor (source: Iterable<T>, public f: (list: FinallyList<T>) => void) { super(source); }
+
+    *[Symbol.iterator]() {
+        try { return yield* this.source; }
+        finally { this.f(this); }
+    }
+}
+
+/** Output of {@link once} */
+export class OnceList<T> extends FixedList<T, T> {
+    executed = false;
+
+    *[Symbol.iterator]() {
+        if (this.executed) throw new RangeError("This list can only be enumerated once");
+        this.executed = true;
+        return yield* this.source;
+    }
+}
+
 /** Output of {@link merge} */
 export class MergeList<T> extends FixedList<T, T> {
     constructor(source: Iterable<T>, public other: Iterable<T>, public flip = false) { super(source); }

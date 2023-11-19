@@ -17,6 +17,7 @@ test("wrap", () => {
 });
 
 test("default", () => {
+    check(linq.empty.default(), [ undefined ]);
     checkLengthFastCount(source.default(12));
     checkLengthFastCount(linq([ 1,2 ]).removeAt(0).removeAt(0).default(12).select(x => x - 11), 1);
 });
@@ -40,6 +41,27 @@ test("shuffle", () => {
         .shuffle()
         .order();
     checkLengthFastCount(source, 9);
+});
+
+test("finally", () => {
+    function *three() {
+        yield 1;
+        yield 2;
+        yield 3;
+    }
+
+    var ok = false;
+    const iter = linq(three).finally(() => ok = true)[Symbol.iterator]();
+    iter.next();
+    expect(ok).toBe(false);
+    iter.return(undefined);
+    expect(ok).toBe(true);
+});
+
+test("once", () => {
+    const temp = source.once();
+    checkLengthFastCount(temp);
+    expect(() => temp.forEach()).toThrow(RangeError);
 });
 
 test("merge", () => {

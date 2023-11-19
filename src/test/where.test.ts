@@ -9,12 +9,24 @@ test("where", () => {
     check(linq([ true, false, true ]).where(), [ true, true ]);
 });
 
+test("ofType", () => {
+    class A { }
+    class B extends A { }
+    class C { }
+    const a = new A(), b = new B(), c = new C();
+    const source = linq([ a, b, c ]);
+    check(source.ofType(Object), source);
+    check(source.ofType(A), [ a, b ]);
+    check(source.ofType(B), [ b ]);
+    check(source.ofType(C), [ c ]);
+});
+
 test("case", () => {
     const pari: number[] = [], lettere: string[] = [];
     const source = linq([ 1, "a", 3, 67, 3, 68 ]);
     const dispari = source
-        .case(x => isNaN(+x), x => lettere.push(<string>x))
-        .case(x => <number>x % 2 === 0, x => pari.push(<number>x));
+        .case(x => isNaN(+x), x => lettere.push(x as string))
+        .case(x => x as number % 2 === 0, x => pari.push(x as number));
     check(pari, []);
     check(lettere, []);
     check(dispari, [ 1, 3, 67, 3 ]);

@@ -72,6 +72,7 @@ export function fastCount(source?: Iterable<any> | null): number {
  * Makes the provided iterator iterable
  * @param iter The iterator to make iterable
  * @param next The first value to pass as next
+ * @returns The same thing {@link iter} returned
  */
 export function *toGenerator<T, R = any, N = unknown>(iter: Iterator<T, R, N>, next?: N) {
     for (var value: T | R; !({ value } = iter.next(next!)).done; )

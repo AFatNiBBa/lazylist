@@ -1,17 +1,18 @@
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
-    preset: 'ts-jest',
-    testEnvironment: 'node',
-    transform: {
-      "\\.tsx?$": [
-        "ts-jest",
-        {
-          tsconfig: {
-            target: "es2020",
-            esModuleInterop: true
-          }
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  transform: {
+    "\\.tsx?$": [
+      "ts-jest",
+      {
+        diagnostics: false,
+        tsconfig: {
+          target: "ESNext",
+          esModuleInterop: true
         }
-      ]
-    }
-  };
+      }
+    ]
+  }
+};

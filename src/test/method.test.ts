@@ -1,9 +1,61 @@
 
 import linq from "..";
-import { check, checkLength } from "../util";
+import { NOT_FOUND, TRUE, check, checkLength, checkLengthFastCount } from "../util";
 
 const source = linq([ 1, 2, 3 ]);
 const wrapped = source.select(x => ({ x }));
+
+test("await", async () => {
+    const temp = await source
+        .select(x => new Promise<number>(t => setTimeout(() => t(x), x)))
+        .await();
+    checkLengthFastCount(temp);
+});
+
+test("pipe", () => check(linq([ 8, 9, 10 ]).pipe(x => x.value.sort()), [ 10, 8, 9 ]));
+
+test("calc", () => {
+    const temp = source.where(TRUE);
+    expect(temp.fastCount).toBe(NOT_FOUND);
+    expect(temp.calc().fastCount).toBe(3);
+});
+
+test("fill", () => {
+    const obj = {};
+    check(source.fill(obj).where(x => x !== obj), []);
+});
+
+test("assign", () => {
+    check(wrapped.assign({ y: 4 }), [
+        { x: 1, y: 4 },
+        { x: 2, y: 4 },
+        { x: 3, y: 4 }
+    ]);
+});
+
+test("but", () => {
+    var sum = 0;
+    const temp = source.but(x => sum += x)[Symbol.iterator]();
+    expect(sum).toBe(0);
+    temp.next();
+    expect(sum).toBe(1);
+    temp.next();
+    expect(sum).toBe(3);
+    expect(temp.next().done).toBe(false);
+    expect(sum).toBe(6);
+    expect(temp.next().done).toBe(true);
+    expect(sum).toBe(6);
+});
+
+test("forEach", () => {
+    function *two() {
+        yield 1;
+        yield 2;
+        return 3;
+    }
+
+    expect(linq(two).forEach()).toBe(3);
+});
 
 test("toMap", () => {
     const map = source.toMap(x => x * 2);
