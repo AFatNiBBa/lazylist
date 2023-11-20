@@ -1,7 +1,7 @@
 
 
 import linq from "..";
-import { check, checkLengthFastCount } from "../util";
+import { check, checkLengthFastCount } from "../util/test";
 
 const source = linq([ 1, 2, 3 ]);
 

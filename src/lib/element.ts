@@ -1,6 +1,6 @@
 
+import { NOT_FOUND, calcIndex } from "../util/util";
 import { FixedList } from "./simple";
-import { NOT_FOUND } from "../util";
 import { TakeList } from "./take";
 import { toGenerator } from "..";
 
@@ -16,7 +16,7 @@ export class InsertList<T> extends FixedList<T, T> {
             return out;
         }
 
-        const [ list, i ] = this.$calcIndex(this.i);
+        const [ list, i ] = calcIndex(this.source, this.i);
         if (i < 0) throw new RangeError("It's not possible to insert an element before the beginning of the original sequence");
 
         const iter = list[Symbol.iterator]();
@@ -40,7 +40,7 @@ export class RemoveAtList<T> extends FixedList<T, T> {
     constructor (source: Iterable<T>, public i: number) { super(source); }
 
     *[Symbol.iterator]() {
-        const [ list, i ] = this.$calcIndex(this.i);
+        const [ list, i ] = calcIndex(this.source, this.i);
         if (i < 0) throw new RangeError("It's not possible to remove an element before the beginning of the original sequence");
 
         const iter = list[Symbol.iterator]();

@@ -1,7 +1,8 @@
 
 import linq, { fastCount, toGenerator } from "..";
-import { NOT_FOUND, checkLength } from "../util";
 import { AbstractList } from "../lib/abstract";
+import { checkLength } from "../util/test";
+import { NOT_FOUND } from "../util/util";
 
 test("linq", () => {
     function *iter() {

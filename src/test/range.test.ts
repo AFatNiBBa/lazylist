@@ -1,6 +1,6 @@
 
 import linq from "..";
-import { check, checkLength, checkLengthFastCount } from "../util";
+import { check, checkLength, checkLengthFastCount } from "../util/test";
 
 test("take", () => {
     checkLengthFastCount(linq([ 1, 2, 3, 0, 1, 4, 5 ]).take(3));

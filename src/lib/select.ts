@@ -2,7 +2,7 @@
 import { Convert, Predicate } from "..";
 import { SourceList } from "./abstract";
 import { FixedList } from "./simple";
-import { IDENTITY } from "../util";
+import { IDENTITY } from "../util/util";
 
 /** Output of {@link select} */
 export class SelectList<I, O> extends FixedList<I, O> {

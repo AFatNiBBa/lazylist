@@ -1,7 +1,7 @@
 
 import linq from "..";
-import { check, checkLength, checkLengthFastCount } from "../util";
 import { EmptyList, RangeList } from "../lib/generative";
+import { check, checkLengthFastCount } from "../util/test";
 
 test("empty", () => {
     const list = linq<number>();

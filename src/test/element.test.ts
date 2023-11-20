@@ -1,6 +1,7 @@
 
 import linq from "..";
-import { NOT_FOUND, check, checkLengthFastCount } from "../util";
+import { check, checkLengthFastCount } from "../util/test";
+import { NOT_FOUND } from "../util/util";
 
 const source = linq([ 1, 2, 3 ]);
 

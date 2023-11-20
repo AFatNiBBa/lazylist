@@ -1,7 +1,7 @@
 
 import { Combine, JoinMode, fastCount } from "..";
 import { FixedList } from "./simple";
-import { TUPLE } from "../util";
+import { TUPLE } from "../util/util";
 
 /** Output of {@link zip} */
 export class ZipList<A, B, R = [ A, B ]> extends FixedList<A, R> {

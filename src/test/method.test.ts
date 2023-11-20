@@ -1,6 +1,7 @@
 
 import linq from "..";
-import { NOT_FOUND, TRUE, check, checkLength, checkLengthFastCount } from "../util";
+import { check, checkLength, checkLengthFastCount } from "../util/test";
+import { NOT_FOUND, TRUE } from "../util/util";
 
 const source = linq([ 1, 2, 3 ]);
 const wrapped = source.select(x => ({ x }));

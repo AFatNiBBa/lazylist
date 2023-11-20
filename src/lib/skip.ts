@@ -2,7 +2,7 @@
 import { Predicate, toGenerator } from "..";
 import { AbstractList } from "./abstract";
 import { FixedList } from "./simple";
-import { NOT_FOUND } from "../util";
+import { NOT_FOUND, calcLength } from "../util/util";
 import { TakeList } from "./take";
 
 /** Output of {@link AbstractList.skip} */
@@ -14,7 +14,7 @@ export class SkipList<T> extends FixedList<T, T> {
         {
             if (this.p >= 0) return yield* SkipList.skip(this.source[Symbol.iterator](), this.p);
 
-            const [ iter, l ] = this.$calcLength();
+            const [ iter, l ] = calcLength(this.source);
             return yield* (this.leftOnNegative ? SkipList.skip : TakeList.take)(iter[Symbol.iterator](), l + this.p);
         }
 
@@ -41,10 +41,8 @@ export class SkipList<T> extends FixedList<T, T> {
             return NOT_FOUND;
 
         const temp = super.fastCount;
-        return ~temp
-            ? this.p < 0 && this.leftOnNegative
-                ? Math.min(temp, -this.p)
-                : Math.max(0, temp - Math.abs(this.p))
-            : NOT_FOUND;
+        return this.p < 0 && this.leftOnNegative
+            ? Math.min(temp, -this.p)
+            : Math.max(0, temp - Math.abs(this.p));
     }
 }

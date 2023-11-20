@@ -1,5 +1,5 @@
 
-import { COMPARE, NOT_FOUND } from "../util";
+import { COMPARE, NOT_FOUND, isReadonlyArray } from "../util/util";
 import { FixedList } from "./simple";
 import { Compare } from "..";
 
@@ -12,7 +12,8 @@ export class OrderList<T> extends FixedList<T, T> {
 
     *[Symbol.iterator]() {
         const { comp } = this, mul = this.desc ? -1 : 1;
-        return yield* slice(this.$sourceAsArray()).sort((a: T, b: T) => mul * comp(a, b, NOT_FOUND, this));
+        const list = isReadonlyArray(this.source) ? slice(this.source) : [ ...this.source ];
+        return yield* list.sort((a: T, b: T) => mul * comp(a, b, NOT_FOUND, this));
     }
 
     /**

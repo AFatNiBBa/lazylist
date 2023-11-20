@@ -1,6 +1,6 @@
 
 import { EmptyList, RandList, RangeList } from "./lib/generative";
-import { COMPARE, NOT_FOUND, hasLength } from "./util";
+import { COMPARE, NOT_FOUND, isReadonlyArray } from "./util/util";
 import { AbstractList } from "./lib/abstract";
 import { FixedList } from "./lib/simple";
 
@@ -40,7 +40,7 @@ export enum JoinMode {
  */
 export function linq<T>(source?: Iterable<T> | Iterator<T> | (() => Iterator<T>) | null, force = false): AbstractList<T> {
     return source == null
-        ? EmptyList.instance
+        ? <AbstractList<T>>EmptyList.instance
         : !force && source instanceof AbstractList
             ? <AbstractList<T>>source
             : new FixedList(
@@ -59,7 +59,7 @@ export function linq<T>(source?: Iterable<T> | Iterator<T> | (() => Iterator<T>)
 export function fastCount(source?: Iterable<any> | null): number {
     return source == null
         ? 0
-        : hasLength(source)
+        : isReadonlyArray(source)
             ? source.length
             : source instanceof Set || source instanceof Map
                 ? source.size

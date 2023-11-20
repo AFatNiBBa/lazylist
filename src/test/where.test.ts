@@ -1,6 +1,6 @@
 
 import linq from "..";
-import { check, checkLength } from "../util";
+import { check, checkLength } from "../util/test";
 
 test("where", () => {
     const source = linq([ 1, 2, 4, 5, 3 ]);

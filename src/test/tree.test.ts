@@ -1,6 +1,11 @@
 
 import linq from "..";
-import { check, checkLength } from "../util";
+import { check, checkLength } from "../util/test";
+
+test("flat", () => {
+    const source = linq([ [ 1, 2, [], [ [ 3 ], [ 4, [ 5, 6 ], 7 ] ], 8, 9 ], 10 ]);
+    checkLength(source.flat(), 10);
+});
 
 test("traverse", () => {
     type node = { v: number, e: node[] };
@@ -28,9 +33,4 @@ test("traverse", () => {
 
     check(source.traverse(x => x.e).select(x => x.v), [ 1, 4, 5, 2, 6, 7, 8 ]);
     check(source.traverse(x => x.e, x => x.v !== 7, true).select(x => x.v), [ 4, 5, 1, 2, 6 ]);
-});
-
-test("flat", () => {
-    const source = linq([ [ 1, 2, [], [ [ 3 ], [ 4, [ 5, 6 ], 7 ] ], 8, 9 ], 10 ]);
-    checkLength(source.flat(), 10);
 });

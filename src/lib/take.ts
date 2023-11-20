@@ -1,5 +1,5 @@
 
-import { IDENTITY, MarkedIterator, NOT_FOUND } from "../util";
+import { IDENTITY, MarkedIterator, NOT_FOUND, calcLength } from "../util/util";
 import { AbstractList } from "./abstract";
 import { JoinMode, Predicate } from "..";
 import { FixedList } from "./simple";
@@ -16,7 +16,7 @@ export class TakeList<T> extends FixedList<T, T> {
         if (this.p >= 0)
             return yield* TakeList.take(this.source[Symbol.iterator](), this.p, this.padEnd, this.def);
 
-        const [ iter, l ] = this.$calcLength();
+        const [ iter, l ] = calcLength(this.source);
         if (this.leftOnNegative)
             return yield* TakeList.take(iter[Symbol.iterator](), l + this.p, this.padEnd, this.def);
 

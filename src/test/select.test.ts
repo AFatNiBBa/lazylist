@@ -1,6 +1,6 @@
 
 import linq from "..";
-import { checkLength, checkLengthFastCount } from "../util";
+import { checkLength, checkLengthFastCount } from "../util/test";
 
 test("select", () => {
     const source = linq([ 2, 3, 4 ]).select(x => x - 1);

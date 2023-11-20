@@ -1,6 +1,6 @@
 
 import linq from "..";
-import { NOT_FOUND, TRUE } from "../util";
+import { NOT_FOUND, TRUE } from "../util/util";
 
 test("cache", () => {
     const source = linq([ 1, 2, 3 ]);

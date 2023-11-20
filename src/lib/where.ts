@@ -1,7 +1,7 @@
 
 import { Convert, Predicate } from "..";
 import { SourceList } from "./abstract";
-import { IDENTITY } from "../util";
+import { IDENTITY } from "../util/util";
 
 /** Output of {@link where} */
 export class WhereList<T> extends SourceList<T, T> {

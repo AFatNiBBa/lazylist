@@ -7,6 +7,8 @@ export class EmptyList extends AbstractList<any> {
     static instance = new this();
 
     *[Symbol.iterator]() { }
+
+    at(_: number) { throw new RangeError("There is no element in an empty list"); }
     
     get fastCount() { return 0; }
 }

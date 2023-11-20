@@ -2,6 +2,7 @@
 import linq, { Convert, fastCount, toGenerator } from "..";
 import { SourceList } from "./abstract";
 import { RandList } from "./generative";
+import { calcArray } from "../util/util";
 
 /**
  * Output of {@link linq}.
@@ -24,6 +25,12 @@ export class WrapList<T, TList extends Iterable<T>> extends SourceList<T, TList>
      * @inheritdoc
      */
     reverse() { return this; }
+
+    at(i: number) {
+        if (i === 0 || i === -1)
+            return <TList>this.source;
+        throw new RangeError("There is just one element in a wrapped list");
+    }
 
     get fastCount() { return 1; }
 }
@@ -58,9 +65,17 @@ export class RepeatList<T> extends FixedList<T, T> {
 /** Output of {@link reverse} */
 export class ReverseList<T> extends FixedList<T, T> {
     *[Symbol.iterator]() {
-        const temp = this.$sourceAsArray();
+        const temp = calcArray(this.source);
         for (var i = temp.length - 1; i >= 0; i--)
             yield temp[i];
+    }
+
+    at(i: number) {
+        if (i >= 0) return super.at(i);
+        for (const elm of this.source)
+            if (!++i)
+                return elm;
+        throw new RangeError("The provided index is before the beginning of the sequence");
     }
 }
 
