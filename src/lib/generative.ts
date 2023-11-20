@@ -49,7 +49,7 @@ export class RangeList extends AbstractList<number> {
      * If the list has no finite length, it will throw a {@link RangeError}
      * @inheritdoc
      */
-    reverse(): AbstractList<number> {
+    reverse() {
         if (!Number.isFinite(this.length)) throw new RangeError("An infinite sequence cannot be reversed");
         const start = this.start + (this.length - 1) * this.step;
         return new RangeList(this.length, start, -this.step);

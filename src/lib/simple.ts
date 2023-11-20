@@ -1,7 +1,7 @@
 
 import linq, { Convert, fastCount, toGenerator } from "..";
-import { AbstractList, SourceList } from "./abstract"; 
 import { calcArray } from "../util/util";
+import { SourceList } from "./abstract"; 
 import { RandList } from "./generative";
 
 /**
@@ -24,7 +24,7 @@ export class WrapList<T, TList extends Iterable<T>> extends SourceList<T, TList>
      * Returns itself
      * @inheritdoc
      */
-    reverse(): AbstractList<TList> { return this; }
+    reverse() { return this; }
 
     at(i: number) {
         if (i === 0 || i === -1)

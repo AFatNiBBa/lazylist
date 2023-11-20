@@ -53,7 +53,7 @@ export class TakeList<T> extends FixedList<T, T> {
      * @param list The list to eventually pass to {@link p}
      * @returns The eventual element that made {@link p} return `false`
      */
-    static *takeWhile<T, TList = never>(iter: MarkedIterator<T>, p: Predicate<T, TList> = IDENTITY, list?: TList) {
+    static *takeWhile<T, TList = undefined>(iter: MarkedIterator<T>, p: Predicate<T, TList> = IDENTITY, list?: TList) {
         var i = 0;
         for (var value: T; !(iter.done = ({ value } = iter.next()).done); )
             if (p(value, i++, list!))

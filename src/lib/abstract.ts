@@ -4,7 +4,7 @@ import { Combine, Compare, Convert, JoinMode, Predicate, by } from "..";
 
 /** An iterable wrapper with helper functions */
 export abstract class AbstractList<T> implements Iterable<T> {
-    abstract [Symbol.iterator](): Generator<T>;
+    abstract [Symbol.iterator](): IterableIterator<T>;
     
     /** Calls {@link Promise.all} on the current list */
     async await(this: AbstractList<T>): Promise<AbstractList<Awaited<T>>> { return new FixedList(await Promise.all(this)); }
@@ -144,6 +144,21 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
      */
     except<K = T>(other: Iterable<K>, f?: Convert<T, K, IntersectList<T, K>>) { return new IntersectList<T, K>(this, other, f, true); }
+
+    /**
+     * Groups the element of {@link source}.
+     * Non lazy
+     * @param k A conversion function that gets the key from each element
+     * @param h A conversion function that gets the actual grouping value from each key
+     */
+    groupBy<K, H = K>(k: Convert<T, K, GroupByList<T, K, H>>, h?: Convert<K, H, GroupByList<T, K, H>>) { return new GroupByList<T, K, H>(this, k, h); }
+
+    /**
+     * Calls {@link GroupByList.lookup} on the current list
+     * @param k A conversion function that gets the key from each element
+     * @param h A conversion function that gets the actual grouping value from each key
+     */
+    lookup<K, H = K>(k: Convert<T, K>, h?: Convert<K, H, AbstractList<T>>) { return GroupByList.lookup(this, k, h, this); }
 
     /**
      * Takes the first {@link p} elements of the list and skips the rest
@@ -426,7 +441,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
 export abstract class SourceList<I, O> extends AbstractList<O> {
     constructor(public source: Iterable<I>) { super(); }
 
-    *[Symbol.iterator](): Generator<O> { return yield* <any>this.source; }
+    *[Symbol.iterator](): IterableIterator<O> { return yield* <any>this.source; }
 }
 
 // These are needed to be imported AFTER the definition of "AbstractList", because it is needed IMMEDIATELY by all of them
@@ -435,6 +450,7 @@ import { CaseList, DistinctList, IntersectList, WhereList } from "./where";
 import { SelectList, SelectManyList, SelectWhereList } from "./select";
 import { InsertList, RemoveAtList } from "./element";
 import { FlatList, TraverseList } from "./tree";
+import { GroupByList } from "./group";
 import { OrderList } from "./order";
 import { CacheList } from "./cache";
 import { TakeList } from "./take";
