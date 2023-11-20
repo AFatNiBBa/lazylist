@@ -1,6 +1,6 @@
 
 import linq from "..";
-import { NOT_FOUND, TRUE } from "../util/util";
+import { NOT_FOUND } from "../util/util";
 
 test("cache", () => {
     const source = linq([ 1, 2, 3 ]);
@@ -33,4 +33,10 @@ test("cache", () => {
     expect(where.fastCount).toBe(NOT_FOUND);
     c.next();
     expect(where.fastCount).toBe(1);
+
+    var n = 0;
+    const at = source.but(() => n++).cache();
+    at.forEach();
+    expect(at.at(1)).toBe(2);
+    expect(n).toBe(3);
 });

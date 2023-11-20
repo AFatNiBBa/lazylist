@@ -1,6 +1,6 @@
 
-import { EmptyList, RandList, RangeList } from "./lib/generative";
 import { COMPARE, NOT_FOUND, isReadonlyArray } from "./util/util";
+import { EmptyList, RandList, RangeList } from "./lib/generative";
 import { AbstractList } from "./lib/abstract";
 import { FixedList } from "./lib/simple";
 

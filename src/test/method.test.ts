@@ -1,6 +1,6 @@
 
 import linq from "..";
-import { check, checkLength, checkLengthFastCount } from "../util/test";
+import { check, checkLength, checkLengthFastCount } from "../util/testing";
 import { NOT_FOUND, TRUE } from "../util/util";
 
 const source = linq([ 1, 2, 3 ]);
@@ -72,6 +72,17 @@ test("toSet", () => {
     expect(() => source.toSet(true)).toThrow(RangeError);
 });
 
+test("at", () => {
+    expect(source.at(0)).toBe(1);
+    expect(source.at(1)).toBe(2);
+    expect(source.at(-1)).toBe(3);
+
+    var finished = false;
+    const list = source.but((_, i) => i == 2 && (finished = true));
+    expect(list.at(-2)).toBe(2);
+    expect(finished).toBe(false);
+});
+
 test("aggregate", () => {
     var k = 0, min = Infinity, max = -Infinity;
     const out = source.aggregate((a, b, i) => {
@@ -126,19 +137,12 @@ test("minBy", () => {
     expect(wrapped.minBy(x => x.x, (a, b) => b - a).x).toBe(3);
 });
 
-test("first", () => {
-    var first = false, second = false;
-    function *two() {
-        try
-        {
-            yield 1;
-            second = true;
-            yield 2;
-        }
-        finally { first = true; }
-    }
+test("sum", () => expect(source.sum).toBe(6));
 
-    expect(linq(two).first).toBe(1);
-    expect(first).toBe(true);
-    expect(second).toBe(false);
+test("avg", () => expect(source.avg).toBe(2));
+
+test("count", () => {
+    const temp = source.where(TRUE);
+    expect(temp.fastCount).toBe(NOT_FOUND);
+    expect(temp.count).toBe(3);
 });

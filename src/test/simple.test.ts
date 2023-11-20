@@ -1,7 +1,7 @@
 
 
 import linq from "..";
-import { check, checkLengthFastCount } from "../util/test";
+import { check, checkLengthFastCount } from "../util/testing";
 
 const source = linq([ 1, 2, 3 ]);
 
@@ -14,6 +14,8 @@ test("wrap", () => {
     expect(value).toHaveLength(1);
     expect(list.fastCount).toBe(1);
     expect(list.reverse()).toBe(list);
+    expect(list.at(0)).toBe(source);
+    expect(() => list.at(1)).toThrow(RangeError);
 });
 
 test("default", () => {
@@ -33,6 +35,11 @@ test("reverse - init", () => {
         .reverse();
     check(list, [ 3, 2, 1 ]);
     expect(first).toBe(1);
+
+    var finished = false;
+    const at = source.but((_, i) => i === 2 && (finished = true)).reverse();
+    expect(at.at(-1)).toBe(1);
+    expect(finished).toBe(false);
 });
 
 test("shuffle", () => {

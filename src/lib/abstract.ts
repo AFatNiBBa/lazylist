@@ -1,6 +1,6 @@
 
-import { Combine, Compare, Convert, JoinMode, Predicate, by } from "..";
 import { COMPARE, IDENTITY, NOT_FOUND, calcIndex, isReadonlyArray } from "../util/util";
+import { Combine, Compare, Convert, JoinMode, Predicate, by } from "..";
 
 /** An iterable wrapper with helper functions */
 export abstract class AbstractList<T> implements Iterable<T> {
@@ -58,7 +58,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * Throws a {@link RangeError} if the list is enumerated more than once
      * The iterator for this list returns the same thing the source returned
      */
-    once(): AbstractList<T> { return new OnceList(this); }
+    once() { return new OnceList(this); }
 
     /**
      * Merges the current list to {@link other}.
@@ -246,13 +246,13 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * Caches the iterator element one by one before they're yielded.
      * Used to prevent multiple enumeration
      */
-    cache(): AbstractList<T> { return new CacheList(this); }
+    cache() { return new CacheList(this); }
 
     /**
      * Calculates each element of the list and wraps them in a {@link FixedList}
      * (Non lazy)
      */
-    calc(): AbstractList<T> { return new FixedList(this.value); }
+    calc() { return new FixedList(this.value); }
 
     /**
      * Passes `this` to {@link f} and then passes the return value to a new {@link FixedList}

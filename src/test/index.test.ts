@@ -1,7 +1,7 @@
 
 import linq, { fastCount, toGenerator } from "..";
 import { AbstractList } from "../lib/abstract";
-import { checkLength } from "../util/test";
+import { checkLength } from "../util/testing";
 import { NOT_FOUND } from "../util/util";
 
 test("linq", () => {

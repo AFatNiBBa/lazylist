@@ -1,8 +1,8 @@
 
+import { NOT_FOUND, calcLength } from "../util/util";
 import { Predicate, toGenerator } from "..";
 import { AbstractList } from "./abstract";
 import { FixedList } from "./simple";
-import { NOT_FOUND, calcLength } from "../util/util";
 import { TakeList } from "./take";
 
 /** Output of {@link AbstractList.skip} */

@@ -1,8 +1,8 @@
 
 import linq, { Convert, fastCount, toGenerator } from "..";
+import { calcArray } from "../util/util";
 import { SourceList } from "./abstract";
 import { RandList } from "./generative";
-import { calcArray } from "../util/util";
 
 /**
  * Output of {@link linq}.

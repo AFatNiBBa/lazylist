@@ -1,6 +1,6 @@
 
 import linq from "..";
-import { checkLengthFastCount } from "../util/test";
+import { checkLengthFastCount } from "../util/testing";
 
 const source = linq([ 7, 4, 3, 2, 5, 6, 1 ]);
 const wrapped = source.select(x => ({ x }));

@@ -1,6 +1,6 @@
 
 import linq, { Combine, JoinMode } from "..";
-import { check } from "../util/test";
+import { check } from "../util/testing";
 
 test("zip", () => {
     const source = linq([ 1, 2, 3 ]);

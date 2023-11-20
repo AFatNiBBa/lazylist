@@ -1,12 +1,13 @@
 
 import linq from "..";
+import { check, checkLengthFastCount } from "../util/testing";
 import { EmptyList, RangeList } from "../lib/generative";
-import { check, checkLengthFastCount } from "../util/test";
 
 test("empty", () => {
     const list = linq<number>();
     expect(list).toBeInstanceOf(EmptyList);
     checkLengthFastCount(list, 0);
+    expect(() => list.at(0)).toThrow(RangeError);
 });
 
 test("rand", () => {
