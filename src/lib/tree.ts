@@ -7,7 +7,9 @@ import { TRUE } from "../util/util";
 type RootElement<T> = T extends Iterable<infer U> ? RootElement<U> : T;
 
 /** Output of {@link AbstractList.flat} */
-export class FlatList<T> extends SourceList<T, RootElement<T>> { [Symbol.iterator]() { return flat(this.source); } }
+export class FlatList<T> extends SourceList<T, RootElement<T>> {
+    [Symbol.iterator](): Generator<RootElement<T>> { return flat(this.source); }
+}
 
 /** Output of {@link AbstractList.traverse} */
 export class TraverseList<T> extends SourceList<T, T> {
