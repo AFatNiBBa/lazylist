@@ -1,6 +1,6 @@
 
 import linq, { Convert, fastCount, toGenerator } from "..";
-import { calcArray } from "../util/util";
+import { NOT_FOUND, calcArray } from "../util/util";
 import { SourceList } from "./abstract"; 
 import { RandList } from "./generative";
 
@@ -47,7 +47,10 @@ export class DefaultList<T> extends FixedList<T, T> {
         return yield* toGenerator(iter);
     }
 
-    get fastCount() { return super.fastCount || 1; }
+    get fastCount() {
+        const temp = super.fastCount;
+        return isNaN(temp) ? NOT_FOUND : temp || 1;
+    }
 }
 
 /** Output of {@link repeat} */

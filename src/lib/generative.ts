@@ -55,5 +55,19 @@ export class RangeList extends AbstractList<number> {
         return new RangeList(this.length, start, -this.step);
     }
 
+    /**
+     * - 
+     * Uses math to get the value
+     * @inheritdoc 
+     */
+    at(i: number) {
+        if (i < 0)
+            if ((i += this.length) < 0)
+                throw new RangeError("The provided index is before the beginning of the sequence");
+        if (i >= this.length)
+            throw new RangeError("The provided index is after the end of the sequence");
+        return i * this.step + this.start;
+    }
+
     get fastCount() { return this.length; }
 }

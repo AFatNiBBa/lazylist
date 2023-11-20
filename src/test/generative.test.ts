@@ -24,6 +24,7 @@ test("range", () => {
 
     const source = linq.range(5, 2, -3);
     const data = [ 2, -1, -4, -7, -10 ];
+    expect(source.at(-3)).toBe(-4);
     check(source, data);
 
     const reversed = source.reverse();
