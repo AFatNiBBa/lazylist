@@ -1,4 +1,5 @@
 
+import ErrorMsg from "../util/errorMsg";
 import { NOT_FOUND, calcIndex } from "../util/util";
 import { FixedList } from "./simple";
 import { TakeList } from "./take";
@@ -17,7 +18,7 @@ export class InsertList<T> extends FixedList<T, T> {
         }
 
         const [ list, i ] = calcIndex(this.source, this.i);
-        if (i < 0) throw new RangeError("It's not possible to insert an element before the beginning of the original sequence");
+        if (i < 0) throw ErrorMsg.beforeBegin();
 
         const iter = list[Symbol.iterator]();
         const taken = yield* TakeList.take(iter, i);
@@ -41,11 +42,11 @@ export class RemoveAtList<T> extends FixedList<T, T> {
 
     *[Symbol.iterator]() {
         const [ list, i ] = calcIndex(this.source, this.i);
-        if (i < 0) throw new RangeError("It's not possible to remove an element before the beginning of the original sequence");
+        if (i < 0) throw ErrorMsg.beforeBegin();
 
         const iter = list[Symbol.iterator]();
         const taken = yield* TakeList.take(iter, i);
-        if (taken !== i || iter.next().done) throw new RangeError("It's not possible to remove an element after the end of the original sequence");
+        if (taken !== i || iter.next().done) throw ErrorMsg.afterEnd();
 
         return yield* toGenerator(iter);
     }

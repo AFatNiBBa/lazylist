@@ -1,5 +1,6 @@
 
 import linq from "..";
+import ErrorMsg from "../util/errorMsg";
 import { AbstractList } from "./abstract";
 
 /** A list with absolutely no items */
@@ -63,9 +64,9 @@ export class RangeList extends AbstractList<number> {
     at(i: number) {
         if (i < 0)
             if ((i += this.length) < 0)
-                throw new RangeError("The provided index is before the beginning of the sequence");
+                throw ErrorMsg.beforeBegin();
         if (i >= this.length)
-            throw new RangeError("The provided index is after the end of the sequence");
+            throw ErrorMsg.afterEnd();
         return i * this.step + this.start;
     }
 

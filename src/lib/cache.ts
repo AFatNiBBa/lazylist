@@ -1,4 +1,5 @@
 
+import ErrorMsg from "../util/errorMsg";
 import { MarkedIterator } from "../util/util";
 import { FixedList } from "./simple";
 import { toGenerator } from "..";
@@ -30,13 +31,13 @@ export class CacheList<T> extends FixedList<T, T> {
             if (i < this.cached.length)
                 return this.cached[i];
             else if (this.iter?.done)
-                throw new RangeError("The provided index is after the end of the sequence");
+                throw ErrorMsg.afterEnd();
             else;
         else if (this.iter?.done)
             if ((i += this.cached.length) >= 0)
                 return this.cached[i];
             else
-                throw new RangeError("The provided index is before the beginning of the sequence");
+                throw ErrorMsg.beforeBegin();
         return super.at(i);
     }
 

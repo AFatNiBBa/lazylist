@@ -1,4 +1,5 @@
 
+import ErrorMsg from "../util/errorMsg";
 import { COMPARE, IDENTITY, NOT_FOUND, calcIndex, isReadonlyArray } from "../util/util";
 import { Combine, Compare, Convert, JoinMode, Predicate, by } from "..";
 
@@ -318,7 +319,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
         const map = new Map<K, V>();
         for (const elm of this)
             if (map.size === map.set(k(elm, i, this), v(elm, i++, this)).size && throwOnDublicate)
-                throw new RangeError("Duplicates are not allowed in this map");
+                throw ErrorMsg.duplicates("this map");
         return map;
     }
 
@@ -330,7 +331,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
         const set = new Set<T>();
         for (const elm of this)
             if (set.size === set.add(elm).size && throwOnDublicate)
-                throw new RangeError("Duplicates are not allowed in this set");
+                throw ErrorMsg.duplicates("this set");
         return set;
     }
 
@@ -342,7 +343,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      */
     at(i: number) {
         const [ list ] = [ , i ] = calcIndex(this, i);
-        if (i < 0) throw new RangeError("The provided index is before the beginning of the sequence");
+        if (i < 0) throw ErrorMsg.beforeBegin();
         if (isReadonlyArray(list))
             if (i < list.length)
                 return list[i];
@@ -350,7 +351,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
         else for (const elm of this)
             if (!i--)
                 return elm;
-        throw new RangeError("The provided index is after the end of the sequence");
+        throw ErrorMsg.afterEnd();
     }
 
     /**

@@ -1,4 +1,5 @@
 
+import ErrorMsg from "../util/errorMsg";
 import linq, { Convert, fastCount, toGenerator } from "..";
 import { AbstractList, SourceList } from "./abstract"; 
 import { NOT_FOUND, calcArray } from "../util/util";
@@ -96,7 +97,7 @@ export class ReverseList<T> extends FixedList<T, T> {
         for (const elm of this.source)
             if (!++i)
                 return elm;
-        throw new RangeError("The provided index is before the beginning of the sequence");
+        throw ErrorMsg.beforeBegin();
     }
 }
 
