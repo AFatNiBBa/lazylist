@@ -20,6 +20,11 @@ export class CacheList<T> extends FixedList<T, T> {
         this.iter.done = true;
     }
 
+    /**
+     * -
+     * Allows you to access already cached elements at O(1)
+     * @inheritdoc
+     */
     at(i: number) {
         if (i >= 0)
             if (i < this.cached.length)

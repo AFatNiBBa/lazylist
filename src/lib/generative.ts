@@ -57,7 +57,7 @@ export class RangeList extends AbstractList<number> {
 
     /**
      * - 
-     * Uses math to get the value
+     * Uses math to get the value at O(1)
      * @inheritdoc 
      */
     at(i: number) {

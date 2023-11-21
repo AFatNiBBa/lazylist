@@ -18,7 +18,7 @@ export class OrderList<T> extends FixedList<T, T> {
 
     /**
      * -
-     * Gets merged with the current {@link OrderList}
+     * Gets merged with the current {@link OrderList} into one single sort operation
      * @inheritdoc
      */
     order(desc?: boolean, comp: Compare<T, OrderList<T>> = COMPARE): OrderList<T> {

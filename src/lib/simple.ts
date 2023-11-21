@@ -1,7 +1,7 @@
 
 import linq, { Convert, fastCount, toGenerator } from "..";
+import { AbstractList, SourceList } from "./abstract"; 
 import { NOT_FOUND, calcArray } from "../util/util";
-import { SourceList } from "./abstract"; 
 import { RandList } from "./generative";
 
 /**
@@ -26,6 +26,11 @@ export class WrapList<T, TList extends Iterable<T>> extends SourceList<T, TList>
      */
     reverse() { return this; }
 
+    /**
+     * -
+     * Does fast checks knowing the fact that there's just one element
+     * @inheritdoc
+     */
     at(i: number) {
         if (i === 0 || i === -1)
             return <TList>this.source;
@@ -73,6 +78,19 @@ export class ReverseList<T> extends FixedList<T, T> {
             yield temp[i];
     }
 
+    /**
+     * -
+     * Uses the source list, since it's already the reversed version of its reversed version.
+     * If {@link source} is not an {@link AbstractList}, it gets wrapped into a {@link FixedList}
+     * @inheritdoc
+     */
+    reverse() { return this.source instanceof AbstractList ? this.source : new FixedList(this.source) }
+
+    /**
+     * -
+     * Computes negative indexes lazily due to the reversing
+     * @inheritdoc
+     */
     at(i: number) {
         if (i >= 0) return super.at(i);
         for (const elm of this.source)

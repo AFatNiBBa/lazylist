@@ -40,6 +40,8 @@ test("reverse - init", () => {
     const at = source.but((_, i) => i === 2 && (finished = true)).reverse();
     expect(at.at(-1)).toBe(1);
     expect(finished).toBe(false);
+
+    expect(source.reverse().reverse()).toBe(source);
 });
 
 test("shuffle", () => {
