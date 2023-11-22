@@ -3,20 +3,21 @@ import { COMPARE, NOT_FOUND, isReadonlyArray } from "./util/util";
 import { EmptyList, RandList, RangeList } from "./lib/generative";
 import { AbstractList } from "./lib/abstract";
 import { FixedList } from "./lib/simple";
+import { ArrayList } from "./lib/array";
 
 export default linq;
 
 /** A function that maps a value into another */
-export type Convert<I, O, TList = AbstractList<I>> = (x: I, i: number, list: TList) => O;
+export type Converter<I, O, TList = AbstractList<I>> = (x: I, i: number, list: TList) => O;
 
 /** A function that checks if a condition applies to a value */
-export type Predicate<T, TList = AbstractList<T>> = Convert<T, boolean, TList>;
+export type Predicate<T, TList = AbstractList<T>> = Converter<T, boolean, TList>;
 
 /** A function that takes two arguments and combines them */
-export type Combine<A, B, R, TList = AbstractList<R>> = (a: A, b: B, i: number, list: TList) => R;
+export type Combinator<A, B, R, TList = AbstractList<R>> = (a: A, b: B, i: number, list: TList) => R;
 
 /** A function that compares two values and returns a positive number if the first is greater than the second, 0 if they're equals and a negative value otherwise */
-export type Compare<T, TList = AbstractList<T>> = Combine<T, T, number, TList>;
+export type Comparer<T, TList = AbstractList<T>> = Combinator<T, T, number, TList>;
 
 /** Indicates how two iterable should be conbined it they have different sizes */
 export enum JoinMode {
@@ -81,16 +82,27 @@ export function *toGenerator<T, R = any, N = unknown>(iter: Iterator<T, R, N>, n
 }
 
 /**
- * Applies a {@link Convert} to a {@link Compare}
+ * Applies a {@link Converter} to a {@link Comparer}
  * @param f A conversion function
  * @param comp A sorting function
  */
-export function by<I, O>(f: Convert<I, O>, comp: Compare<O, AbstractList<I>> = COMPARE): Compare<I> {
+export function by<I, O>(f: Converter<I, O>, comp: Comparer<O, AbstractList<I>> = COMPARE): Comparer<I> {
     return (a, b, i, list) => comp(f(a, i, list), f(b, i, list), i, list);
 }
 
 /** A sequence with 0 elements */
 linq.empty = EmptyList.instance;
+
+/**
+ * Changes the provided array into an {@link ArrayList}.
+ * The array loses most of its methods in exchange for the {@link AbstractList} ones.
+ * You can still call the original array methods with {@link Function.call}
+ * ```js
+ * Array.prototype.sort.call(arrayList); // (As an example)
+ * ```
+ * @param vet The array to convert
+ */
+linq.array = <T>(vet: ArrayLike<T> = []): asserts vet is ArrayList<T> => Object.setPrototypeOf(vet, ArrayList.prototype);
 
 /**
  * Returns an INFINITE sequence of random numbers comprised between {@link bottom} and {@link top}, both included.

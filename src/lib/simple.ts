@@ -1,6 +1,6 @@
 
 import ErrorMsg from "../util/errorMsg";
-import linq, { Convert, fastCount, toGenerator } from "..";
+import linq, { Converter, fastCount, toGenerator } from "..";
 import { AbstractList, SourceList } from "./abstract"; 
 import { NOT_FOUND, calcArray } from "../util/util";
 import { RandList } from "./generative";
@@ -115,7 +115,7 @@ export class ShuffleList<T> extends FixedList<T, T> {
 
 /** Output of {@link init} */
 export class InitList<T> extends FixedList<T> {
-    constructor (source: Iterable<T>, public f: Convert<T, void, InitList<T>>) { super(source); }
+    constructor (source: Iterable<T>, public f: Converter<T, void, InitList<T>>) { super(source); }
 
     *[Symbol.iterator]() {
         const iter = this.source[Symbol.iterator]();

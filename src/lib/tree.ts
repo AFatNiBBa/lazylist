@@ -1,6 +1,6 @@
 
 import { AbstractList, SourceList } from "./abstract";
-import { Convert, Predicate } from "..";
+import { Converter, Predicate } from "..";
 import { TRUE } from "../util/util";
 
 /** The type of {@link T} or the one of its elements if it has any */
@@ -13,7 +13,7 @@ export class FlatList<T> extends SourceList<T, RootElement<T>> {
 
 /** Output of {@link AbstractList.traverse} */
 export class TraverseList<T> extends SourceList<T, T> {
-    constructor (source: Iterable<T>, public f: Convert<T, Iterable<T>, TraverseList<T>>, public p: Predicate<T, TraverseList<T>> = TRUE, public flip = false) { super(source); }
+    constructor (source: Iterable<T>, public f: Converter<T, Iterable<T>, TraverseList<T>>, public p: Predicate<T, TraverseList<T>> = TRUE, public flip = false) { super(source); }
 
     [Symbol.iterator]() { return traverse(this); }
 }

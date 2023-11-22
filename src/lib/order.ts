@@ -1,14 +1,14 @@
 
 import { COMPARE, NOT_FOUND, isReadonlyArray } from "../util/util";
 import { FixedList } from "./simple";
-import { Compare } from "..";
+import { Comparer } from "..";
 
 /** Array slice but works with strings too */
 const slice: <T>(x: readonly T[]) => T[] = Function.prototype.call.bind(Array.prototype.slice);
 
 /** Output of {@link order} and {@link orderBy} */
 export class OrderList<T> extends FixedList<T, T> {
-    constructor(source: Iterable<T>, public desc = false, public comp: Compare<T, OrderList<T>> = COMPARE) { super(source); }
+    constructor(source: Iterable<T>, public desc = false, public comp: Comparer<T, OrderList<T>> = COMPARE) { super(source); }
 
     *[Symbol.iterator]() {
         const { comp } = this, mul = this.desc ? -1 : 1;
@@ -21,7 +21,7 @@ export class OrderList<T> extends FixedList<T, T> {
      * Gets merged with the current {@link OrderList} into one single sort operation
      * @inheritdoc
      */
-    order(desc?: boolean, comp: Compare<T, OrderList<T>> = COMPARE): OrderList<T> {
+    order(desc?: boolean, comp: Comparer<T, OrderList<T>> = COMPARE): OrderList<T> {
         return new OrderList(this.source, desc, (a, b, i, list) => comp(a, b, i, list) || this.comp(a, b, i, list));
     }
 }

@@ -1,11 +1,11 @@
 
-import { Combine, JoinMode, fastCount } from "..";
+import { Combinator, JoinMode, fastCount } from "..";
 import { FixedList } from "./simple";
 import { TUPLE } from "../util/util";
 
 /** Output of {@link zip} */
 export class ZipList<A, B, R = [ A, B ]> extends FixedList<A, R> {
-    constructor(source: Iterable<A>, public other: Iterable<B>, public f: Combine<A, B, R, ZipList<A, B, R>> = TUPLE, public mode: JoinMode = JoinMode.inner) { super(source); }
+    constructor(source: Iterable<A>, public other: Iterable<B>, public f: Combinator<A, B, R, ZipList<A, B, R>> = TUPLE, public mode: JoinMode = JoinMode.inner) { super(source); }
 
     *[Symbol.iterator](): Generator<R> {
 

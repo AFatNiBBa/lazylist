@@ -1,12 +1,12 @@
 
-import linq, { Combine, JoinMode } from "..";
+import linq, { Combinator, JoinMode } from "..";
 import { check } from "../util/testing";
 
 test("zip", () => {
     const source = linq([ 1, 2, 3 ]);
     const small = [ 4, 5 ];
     const big = [ 6, 7, 8, 9 ];
-    const f: Combine<number, number, number> = (a, b) => a + b;
+    const f: Combinator<number, number, number> = (a, b) => a + b;
 
     check(source.zip(small), [ [ 1, 4 ], [ 2, 5 ] ]);
     

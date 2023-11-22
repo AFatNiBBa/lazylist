@@ -2,7 +2,7 @@
 import { AbstractList, SourceList } from "./abstract";
 import { IDENTITY } from "../util/util";
 import { FixedList } from "./simple";
-import { Convert } from "..";
+import { Converter } from "..";
 
 /**
  * Element of the output of {@link groupBy}.
@@ -22,7 +22,7 @@ export class Grouping<T, K> extends FixedList<T, T> {
 
 /** Output of {@link groupBy} */
 export class GroupByList<T, K, H = K> extends SourceList<T, Grouping<T, K>> {
-    constructor(source: Iterable<T>, public k: Convert<T, K, GroupByList<T, K, H>>, public h?: Convert<K, H, GroupByList<T, K, H>>) { super(source); }
+    constructor(source: Iterable<T>, public k: Converter<T, K, GroupByList<T, K, H>>, public h?: Converter<K, H, GroupByList<T, K, H>>) { super(source); }
 
     [Symbol.iterator]() { return GroupByList.lookup(this.source, this.k, this.h, this).values(); }
 
@@ -34,7 +34,7 @@ export class GroupByList<T, K, H = K> extends SourceList<T, Grouping<T, K>> {
      * @param fH A conversion function that gets the actual grouping value from each key
      * @param list The list to eventually pass to {@link p}
      */
-    static lookup<T, K, H = K, TList = undefined>(source: Iterable<T>, fK: Convert<T, K, TList>, fH: Convert<K, H, TList> = IDENTITY, list?: TList) {
+    static lookup<T, K, H = K, TList = undefined>(source: Iterable<T>, fK: Converter<T, K, TList>, fH: Converter<K, H, TList> = IDENTITY, list?: TList) {
         var i = 0;
         const map = new Map<H, Grouping<T, K>>();
         for (const elm of source)

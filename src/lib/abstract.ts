@@ -1,7 +1,7 @@
 
 import ErrorMsg from "../util/errorMsg";
-import { COMPARE, IDENTITY, NOT_FOUND, calcIndex, isReadonlyArray } from "../util/util";
-import { Combine, Compare, Convert, JoinMode, Predicate, by } from "..";
+import { COMPARE, EQUALS, IDENTITY, NOT_FOUND, calcIndex, isReadonlyArray } from "../util/util";
+import { Combinator, Comparer, Converter, JoinMode, Predicate, by, toGenerator } from "..";
 
 /** An iterable wrapper with helper functions */
 export abstract class AbstractList<T> implements Iterable<T> {
@@ -12,6 +12,12 @@ export abstract class AbstractList<T> implements Iterable<T> {
 
     /** Outputs an iterable that will contain the current one as its only element */
     wrap() { return new WrapList<T, this>(this); }
+
+    /**
+     * Tells TypeScript that the current list accepts values of type {@link O}
+     * @returns `this`
+     */
+    accept<O>() { return this as AbstractList<T | O>; }
 
     /**
      * Forces the list to have at least one element by adding a default value if the list is empty
@@ -46,7 +52,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * The iterator for this list returns the same thing the source returned
      * @param f A function
      */
-    init(f: Convert<T, void, InitList<T>>) { return new InitList<T>(this, f); }
+    init(f: Converter<T, void, InitList<T>>) { return new InitList<T>(this, f); }
 
     /**
      * Executes {@link f} at the end of the iteration
@@ -75,19 +81,19 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param f A combination function, if not provided the pairs will be put in a tuple
      * @param mode Different length handling
      */
-    zip<O, R = [ T, O ]>(other: Iterable<O>, f?: Combine<T, O, R, ZipList<T, O, R>>, mode?: JoinMode) { return new ZipList<T, O, R>(this, other, f, mode); }
+    zip<O, R = [ T, O ]>(other: Iterable<O>, f?: Combinator<T, O, R, ZipList<T, O, R>>, mode?: JoinMode) { return new ZipList<T, O, R>(this, other, f, mode); }
 
     /**
      * Converts the list based on {@link f}
      * @param f A conversion function
      */
-    select<R>(f: Convert<T, R, SelectList<T, R>>) { return new SelectList<T, R>(this, f); }
+    select<R>(f: Converter<T, R, SelectList<T, R>>) { return new SelectList<T, R>(this, f); }
 
     /**
      * Converts the current list to a list of iterables based on {@link f} and concats every element
      * @param f A conversion function; If omitted, the element itself will be used
      */
-    selectMany<R = T extends Iterable<infer U> ? U : never>(f?: Convert<T, Iterable<R>, SelectManyList<T, R>>) { return new SelectManyList<T, R>(this, f); }
+    selectMany<R = T extends Iterable<infer U> ? U : never>(f?: Converter<T, Iterable<R>, SelectManyList<T, R>>) { return new SelectManyList<T, R>(this, f); }
 
     /**
      * Converts and filters the list based on {@link f} at the same time.
@@ -124,27 +130,27 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param p A predicate function
      * @param f A function
      */
-    case(p: Predicate<T, CaseList<T>>, f: Convert<T, void, CaseList<T>>) { return new CaseList<T>(this, p, f); }
+    case(p: Predicate<T, CaseList<T>>, f: Converter<T, void, CaseList<T>>) { return new CaseList<T>(this, p, f); }
 
     /**
      * Ensures every element of the list shows up only once
      * @param f A conversion function that returns the the part of the element to check duplicates for; If omitted, the element itself will be used
      */
-    distinct<K = T>(f?: Convert<T, K, DistinctList<T, K>>) { return new DistinctList<T, K>(this, f); }
+    distinct<K = T>(f?: Converter<T, K, DistinctList<T, K>>) { return new DistinctList<T, K>(this, f); }
 
     /**
      * Ensures only elements of {@link other} show up in the list.
      * Every time the iteration starts, {@link other} is completely calculated
      * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
      */
-    intersect<K = T>(other: Iterable<K>, f?: Convert<T, K, IntersectList<T, K>>) { return new IntersectList<T, K>(this, other, f); }
+    intersect<K = T>(other: Iterable<K>, f?: Converter<T, K, IntersectList<T, K>>) { return new IntersectList<T, K>(this, other, f); }
 
     /**
      * Ensures no element of {@link other} shows up in the list.
      * Every time the iteration starts, {@link other} is completely calculated
      * @param f A conversion function that returns the the part of the element to check for in the list; If omitted, the element itself will be used
      */
-    except<K = T>(other: Iterable<K>, f?: Convert<T, K, IntersectList<T, K>>) { return new IntersectList<T, K>(this, other, f, true); }
+    except<K = T>(other: Iterable<K>, f?: Converter<T, K, IntersectList<T, K>>) { return new IntersectList<T, K>(this, other, f, true); }
 
     /**
      * Groups the element of {@link source}.
@@ -152,14 +158,14 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param k A conversion function that gets the key from each element
      * @param h A conversion function that gets the actual grouping value from each key
      */
-    groupBy<K, H = K>(k: Convert<T, K, GroupByList<T, K, H>>, h?: Convert<K, H, GroupByList<T, K, H>>) { return new GroupByList<T, K, H>(this, k, h); }
+    groupBy<K, H = K>(k: Converter<T, K, GroupByList<T, K, H>>, h?: Converter<K, H, GroupByList<T, K, H>>) { return new GroupByList<T, K, H>(this, k, h); }
 
     /**
      * Calls {@link GroupByList.lookup} on the current list
      * @param k A conversion function that gets the key from each element
      * @param h A conversion function that gets the actual grouping value from each key
      */
-    lookup<K, H = K>(k: Convert<T, K>, h?: Convert<K, H, AbstractList<T>>) { return GroupByList.lookup(this, k, h, this); }
+    lookup<K, H = K>(k: Converter<T, K>, h?: Converter<K, H, AbstractList<T>>) { return GroupByList.lookup(this, k, h, this); }
 
     /**
      * Takes the first {@link p} elements of the list and skips the rest
@@ -201,7 +207,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param p A predicate function 
      * @param flip If `true` the children will be yielded before the parent
      */
-    traverse(f: Convert<T, Iterable<T>, TraverseList<T>>, p?: Predicate<T, TraverseList<T>>, flip?: boolean) { return new TraverseList<T>(this, f, p, flip); }
+    traverse(f: Converter<T, Iterable<T>, TraverseList<T>>, p?: Predicate<T, TraverseList<T>>, flip?: boolean) { return new TraverseList<T>(this, f, p, flip); }
 
     /**
      * Sorts the current list.
@@ -211,7 +217,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param desc If `true`, reverses the results
      * @param comp A sorting function
      */
-    order(desc?: boolean, comp?: Compare<T, OrderList<T>>) { return new OrderList<T>(this, desc, comp); }
+    order(desc?: boolean, comp?: Comparer<T, OrderList<T>>) { return new OrderList<T>(this, desc, comp); }
 
     /**
      * Sorts the current list based on the value returned by {@link f} for each element of the current list.
@@ -222,7 +228,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param comp A sorting function
      * @param desc If `true`, reverses the results
      */
-    orderBy<K>(f: Convert<T, K, OrderList<T>>, desc?: boolean, comp?: Compare<K, OrderList<T>>): OrderList<T> { return this.order(desc, by(f, comp)); }
+    orderBy<K>(f: Converter<T, K, OrderList<T>>, desc?: boolean, comp?: Comparer<K, OrderList<T>>): OrderList<T> { return this.order(desc, by(f, comp)); }
 
     /**
      * Inserts {@link value} at index {@link i}.
@@ -292,7 +298,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * Executes {@link f} for every element of the list before yielding it
      * @param f A function
      */
-    but(f: Convert<T, void, this>) { return this.select((x, i) => (f(x, i, this), x)); }
+    but(f: Converter<T, void, this>) { return this.select((x, i) => (f(x, i, this), x)); }
 
     /**
      * Executes {@link f} on each element of the list forcing it to be entirely calculated.
@@ -300,7 +306,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param f A function
      * @returns The same thing the iterator of the current list returned
      */
-    forEach(f?: Convert<T, void, this>) {
+    forEach(f?: Converter<T, void, this>) {
         var i = 0;
         const iter = this[Symbol.iterator]()
         for (var value: T; !({ value } = iter.next()).done; )
@@ -314,7 +320,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param v A conversion function that gets the value; If omitted, the whole element will be used as a value
      * @param throwOnDublicate If it's set to `true`, it throws a {@link RangeError} if a key is duplicate
      */
-    toMap<K, V = T>(k: Convert<T, K, this>, v: Convert<T, V, this> = IDENTITY, throwOnDublicate = false) {
+    toMap<K, V = T>(k: Converter<T, K, this>, v: Converter<T, V, this> = IDENTITY, throwOnDublicate = false) {
         var i = 0;
         const map = new Map<K, V>();
         for (const elm of this)
@@ -360,15 +366,15 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param out The initial state of the aggregation; It defaults to the first element (Which will be skipped in the iteration)
      * @param f A combination function
      */
-    aggregate(f: Combine<T, T, T, this>): T;
-    aggregate<R>(out: R, f: Combine<R, T, R, this>): R;
-    aggregate(out: T | Combine<T, T, T>, f?: Combine<T, T, T>): T {
+    aggregate(f: Combinator<T, T, T, this>): T;
+    aggregate<R>(out: R, f: Combinator<R, T, R, this>): R;
+    aggregate(out: T | Combinator<T, T, T>, f?: Combinator<T, T, T>): T {
         var i = 0;
         for (const elm of this)
             if (f)
                 out = f(<T>out, elm, i++, this);
             else
-                f = out as Combine<T, T, T>,
+                f = out as Combinator<T, T, T>,
                 out = elm,
                 i++;
         if (f) return <T>out;
@@ -376,30 +382,106 @@ export abstract class AbstractList<T> implements Iterable<T> {
     }
 
     /**
+     * Joins the list elements using {@link sep} as the separator
+     * @param sep The separator
+     */
+    concat(sep = "") { return this.accept<string>().default("").aggregate((a, b) => `${a}${sep}${b}`); }
+
+    /**
      * Returns the biggest value in the list
      * @param comp A sorting function
      */
-    max(comp: Compare<T, this> = COMPARE) { return this.aggregate((a, b, i, list) => comp(a, b, i, list) > 0 ? a : b); }
+    max(comp: Comparer<T, this> = COMPARE) { return this.aggregate((a, b, i, list) => comp(a, b, i, list) > 0 ? a : b); }
 
     /**
      * Returns the element of the list with which {@link f} has returned the biggest value
      * @param f A conversion function
      * @param comp A sorting function
      */
-    maxBy<K>(f: Convert<T, K, this>, comp?: Compare<K, this>): T { return this.max(by(f, comp)); }
+    maxBy<K>(f: Converter<T, K, this>, comp?: Comparer<K, this>): T { return this.max(by(f, comp)); }
 
     /**
      * Returns the smaller value in the list
      * @param comp A sorting function
      */
-    min(comp: Compare<T, this> = COMPARE) { return this.max((a, b, i, list) => -comp(a, b, i, list)); }
+    min(comp: Comparer<T, this> = COMPARE) { return this.max((a, b, i, list) => -comp(a, b, i, list)); }
 
     /**
      * Returns the element of the list with which {@link f} has returned the smallest value
      * @param f A conversion function
      * @param comp A sorting function
      */
-    minBy<K>(f: Convert<T, K, this>, comp?: Compare<K, this>): T { return this.min(by(f, comp)); }
+    minBy<K>(f: Converter<T, K, this>, comp?: Comparer<K, this>): T { return this.min(by(f, comp)); }
+
+    /**
+     * Returns `true` if a value is in the list
+     * @param value The value
+     * @param f An equality comparison function; The second argument is always {@link value}
+     */
+    has(value: T, f: Combinator<T, T, boolean, this> = EQUALS) { return this.any((x, i, list) => f(x, value, i, list)); }
+    
+    /**
+     * Returns `true` if {@link f} returns `true` for at least one element of the list
+     * @param f A predicate function; It defaults to the identity function
+     */
+    any<K>(f: Converter<T, K, this> = IDENTITY) { return !this.all((x, i, list) => !f(x, i, list)); }
+
+    /**
+     * Returns `true` if {@link f} returns `true` for every element of the list
+     * @param f A predicate function; It defaults to the identity function
+     */
+    all<K>(f: Converter<T, K, this> = IDENTITY) {
+        var i = 0;
+        for (const elm of this)
+            if (!f(elm, i++, this))
+                return false;
+        return true;
+    }
+
+    /**
+     * Returns `true` if all the elements of the sequence are equal.
+     * If the list is empty, it returns `true`
+     * @param f An equality comparison function; The second argument is always the first element of the list
+     */
+    same(f: Combinator<T, T, boolean, this> = EQUALS) {
+        var i = 1, first: T;
+        const iter = this[Symbol.iterator]();
+        if (!({ value: first } = iter.next()).done)
+            for (const elm of toGenerator(iter))
+                if (!f(elm, first, i++, this))
+                    return false;
+        return true;
+    }
+
+    /**
+     * Given multiple predicate functions it returns an array containing for each function the times it returned `true`
+     * @param p The predicate functions
+     */
+    multiCount<K extends Predicate<T, this>[]>(...p: K) {
+        var i = 0;
+        const out = p.map(() => 0) as { [k in keyof K]: number };
+        for (const elm of this) {
+            for (var k = 0; k < p.length; k++)
+                if (p[k](elm, i, this))
+                    out[k]++;
+            i++;
+        }
+        return out;
+    }
+
+    /**
+     * Executes the predicate function on each element of the list and returns the first element for which it returns `true` and its index
+     * @param p A predicate function
+     * @returns The index of the first element for which the predicate returns `true` end the element itself
+     */
+    find(p: Predicate<T, this>): [ index: -1 ] | [ index: number, value: T ] {
+        var i = 0;
+        for (const elm of this)
+            if (p(elm, i, this))
+                return [ i, elm ];
+            else i++;
+        return [ -1 ];
+    }
 
     /** Returns the length of the iterable if it is easy to compute, otherwise it returns {@link NOT_FOUND} */
     get fastCount() { return NOT_FOUND; }

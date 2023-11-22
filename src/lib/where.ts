@@ -1,5 +1,5 @@
 
-import { Convert, Predicate } from "..";
+import { Converter, Predicate } from "..";
 import { SourceList } from "./abstract";
 import { IDENTITY } from "../util/util";
 
@@ -23,7 +23,7 @@ export class WhereList<T> extends SourceList<T, T> {
 
 /** Output of {@link case} */
 export class CaseList<T> extends SourceList<T, T> {
-    constructor (source: Iterable<T>, public p: Predicate<T, CaseList<T>>, public f: Convert<T, void, CaseList<T>>) { super(source); }
+    constructor (source: Iterable<T>, public p: Predicate<T, CaseList<T>>, public f: Converter<T, void, CaseList<T>>) { super(source); }
 
     *[Symbol.iterator]() {
         var i = 0;
@@ -37,7 +37,7 @@ export class CaseList<T> extends SourceList<T, T> {
 
 /** Output of {@link distinct} */
 export class DistinctList<T, K = T> extends SourceList<T, T> {
-    constructor (source: Iterable<T>, public f: Convert<T, K, DistinctList<T, K>> = IDENTITY) { super(source); }
+    constructor (source: Iterable<T>, public f: Converter<T, K, DistinctList<T, K>> = IDENTITY) { super(source); }
 
     *[Symbol.iterator]() {
         var i = 0;
@@ -50,7 +50,7 @@ export class DistinctList<T, K = T> extends SourceList<T, T> {
 
 /** Output of {@link intersect} */
 export class IntersectList<T, K = T> extends SourceList<T, T> {
-    constructor (source: Iterable<T>, public other: Iterable<K>, public f: Convert<T, K, IntersectList<T, K>> = IDENTITY, public negate = false) { super(source); }
+    constructor (source: Iterable<T>, public other: Iterable<K>, public f: Converter<T, K, IntersectList<T, K>> = IDENTITY, public negate = false) { super(source); }
 
     *[Symbol.iterator]() {
         var i = 0;

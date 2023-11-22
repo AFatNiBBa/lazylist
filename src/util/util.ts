@@ -1,5 +1,5 @@
 
-import { Combine, Compare, Convert, Predicate, fastCount } from "..";
+import { Combinator, Comparer, Converter, Predicate, fastCount } from "..";
 
 /** Base type of typed arrays */
 const TypedArray = Object.getPrototypeOf(Uint8Array) as typeof Array;
@@ -13,16 +13,19 @@ export type MarkedIterator<T> = Iterator<T> & { done?: boolean };
 /** Value returned when it has been impossible to get a numeric result */
 export const NOT_FOUND = NaN;
 
-/** The default {@link Predicate}: Returns always `true` */
+/** A {@link Predicate}: Returns always `true` */
 export const TRUE = () => true;
 
-/** The default {@link Convert}: The identity function */
+/** A {@link Converter}: The identity function */
 export const IDENTITY = (x: any) => x;
 
-/** The default {@link Combine}: Creates a tuple */
+/** A {@link Combinator}: Creates a tuple */
 export const TUPLE = (a: any, b: any) => <any>[ a, b ];
 
-/** The default {@link Compare}: Uses the `<` and `>` operators */
+/** A {@link Combinator}: Checks for strict equality */
+export const EQUALS = (a: any, b: any) => a === b;
+
+/** A {@link Comparer}: Uses the `<` and `>` operators */
 export const COMPARE = (a: any, b: any) => a > b ? 1 : a < b ? -1 : 0;
 
 /**

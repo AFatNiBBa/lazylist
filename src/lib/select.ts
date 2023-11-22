@@ -1,12 +1,12 @@
 
-import { Convert, Predicate } from "..";
+import { Converter, Predicate } from "..";
 import { SourceList } from "./abstract";
 import { IDENTITY } from "../util/util";
 import { FixedList } from "./simple";
 
 /** Output of {@link select} */
 export class SelectList<I, O> extends FixedList<I, O> {
-    constructor (source: Iterable<I>, public f: Convert<I, O, SelectList<I, O>>) { super(source); }
+    constructor (source: Iterable<I>, public f: Converter<I, O, SelectList<I, O>>) { super(source); }
 
     *[Symbol.iterator]() {
         var i = 0;
@@ -17,7 +17,7 @@ export class SelectList<I, O> extends FixedList<I, O> {
 
 /** Output of {@link selectMany} */
 export class SelectManyList<I, O = I extends Iterable<infer U> ? U : never> extends SourceList<I, O> {
-    constructor (source: Iterable<I>, public f: Convert<I, Iterable<O>, SelectManyList<I, O>> = IDENTITY) { super(source); }
+    constructor (source: Iterable<I>, public f: Converter<I, Iterable<O>, SelectManyList<I, O>> = IDENTITY) { super(source); }
 
     *[Symbol.iterator]() {
         var i = 0;

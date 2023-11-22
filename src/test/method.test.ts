@@ -117,6 +117,11 @@ test("aggregate - out", () => {
     expect(linq<number>().aggregate(1, (a, b) => a * b)).toBe(1);
 });
 
+test("concat", () => {
+    expect(source.concat()).toBe("123");
+    expect(source.concat(", ")).toBe("1, 2, 3");
+});
+
 test("max", () => {
     expect(source.max()).toBe(3);
     expect(wrapped.max((a, b) => a.x - b.x).x).toBe(3);
@@ -135,6 +140,52 @@ test("min", () => {
 test("minBy", () => {
     expect(wrapped.minBy(x => x.x).x).toBe(1);
     expect(wrapped.minBy(x => x.x, (a, b) => b - a).x).toBe(3);
+});
+
+test("has", () => {
+    expect(source.has(2)).toBe(true);
+    expect(source.has(4)).toBe(false);
+});
+
+test("any", () => {
+    expect(source.any(x => x === 1)).toBe(true);
+    expect(source.any(x => x === 4)).toBe(false);
+    expect(source.any()).toBe(true);
+    expect(linq().any()).toBe(false);
+    expect(linq([ 0 ]).any()).toBe(false);
+});
+
+test("all", () => {
+    expect(source.all(x => x !== 1)).toBe(false);
+    expect(source.all(x => x !== 4)).toBe(true);
+    expect(source.all()).toBe(true);
+    expect(linq().all()).toBe(true);
+    expect(linq([ 0 ]).all()).toBe(false);
+});
+
+test("same", () => {
+    expect(source.same()).toBe(false);
+    expect(linq().same()).toBe(true);
+    expect(linq([ 0 ]).same()).toBe(true);
+    expect(linq([ 1, 1 ]).same()).toBe(true);
+});
+
+test("multiCount", () => {
+    const [ div1, even, div3, div5 ] = source.append(4).multiCount(x => x % 1 == 0, x => x % 2 == 0, x => x % 3 == 0, x => x % 5 == 0);
+    expect(div1).toBe(4);
+    expect(even).toBe(2);
+    expect(div3).toBe(1);
+    expect(div5).toBe(0);
+});
+
+test("find", () => {
+    const [ twoI, twoV ] = source.find(x => x % 2 == 0);
+    expect(twoI).toBe(1);
+    expect(twoV).toBe(2);
+
+    const [ unknown, nothing ] = source.find(x => x === 5);
+    expect(unknown).toBe(-1);
+    expect(nothing).toBe(undefined);
 });
 
 test("sum", () => expect(source.sum).toBe(6));
