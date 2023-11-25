@@ -5,6 +5,7 @@ import { join } from "path";
 
 export default defineConfig({
     plugins: [ dtsPlugin({ rollupTypes: true }) ],
+    esbuild: { target: "Es2022" },
     build: {
         minify: false,
         target: "EsNext",
