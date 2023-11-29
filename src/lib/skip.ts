@@ -12,10 +12,15 @@ export class SkipList<T> extends FixedList<T, T> {
     *[Symbol.iterator]() {
         if (typeof this.p === "number")
         {
-            if (this.p >= 0) return yield* SkipList.skip(this.source[Symbol.iterator](), this.p);
+            if (this.p >= 0)
+            {
+                using iter = this.source[Symbol.iterator]();
+                return yield* SkipList.skip(iter, this.p);
+            }
 
-            const [ iter, l ] = calcLength(this.source);
-            return yield* (this.leftOnNegative ? SkipList.skip : TakeList.take)(iter[Symbol.iterator](), l + this.p);
+            const [ list, l ] = calcLength(this.source);
+            using iter = list[Symbol.iterator]();
+            return yield* (this.leftOnNegative ? SkipList.skip : TakeList.take)(iter, l + this.p);
         }
 
         var i = 0, done = false;

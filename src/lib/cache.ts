@@ -5,7 +5,7 @@ import { FixedList } from "./simple";
 import { toGenerator } from "..";
 
 /** Output of {@link cache} */
-export class CacheList<T> extends FixedList<T, T> {
+export class CacheList<T> extends FixedList<T, T> implements Disposable {
     iter: MarkedIterator<T> | undefined;
     cached: T[] = [];
 
@@ -19,6 +19,12 @@ export class CacheList<T> extends FixedList<T, T> {
                 yield this.cached[prev++]; // Yields the element that were put in the cache by other enumerations during the previous yield
         }
         this.iter.done = true;
+    }
+    
+    [Symbol.dispose]() {
+        if (!this.iter) return;
+        this.iter[Symbol.dispose]();
+        this.iter = undefined;
     }
 
     /**

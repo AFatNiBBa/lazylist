@@ -11,16 +11,23 @@ export class TakeList<T> extends FixedList<T, T> {
 
     *[Symbol.iterator]() {
         if (typeof this.p === "function")
-            return yield* TakeList.takeWhile(this.source[Symbol.iterator](), this.p, this);
+        {
+            using iter = this.source[Symbol.iterator]();
+            return yield* TakeList.takeWhile(iter, this.p, this);
+        }
 
         if (this.p >= 0)
-            return yield* TakeList.take(this.source[Symbol.iterator](), this.p, this.padEnd, this.def);
+        {
+            using iter = this.source[Symbol.iterator]();
+            return yield* TakeList.take(iter, this.p, this.padEnd, this.def);
+        }
 
-        const [ iter, l ] = calcLength(this.source);
+        const [ list, l ] = calcLength(this.source);
+        using iter = list[Symbol.iterator]();
         if (this.leftOnNegative)
-            return yield* TakeList.take(iter[Symbol.iterator](), l + this.p, this.padEnd, this.def);
+            return yield* TakeList.take(iter, l + this.p, this.padEnd, this.def);
 
-        yield* SkipList.skip(iter[Symbol.iterator](), l + this.p);
+        yield* SkipList.skip(iter, l + this.p);
         if (this.padEnd)
             for (var i = l; i < -this.p; i++)
                 yield this.def!;

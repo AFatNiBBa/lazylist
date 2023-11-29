@@ -47,7 +47,7 @@ export class DefaultList<T> extends FixedList<T, T> {
 
     *[Symbol.iterator]() {
         var value: T;
-        const iter = this.source[Symbol.iterator]();
+        using iter = this.source[Symbol.iterator]();
         if (({ value } = iter.next()).done) return yield this.def!, <any>value;
         else yield value;
         return yield* toGenerator(iter);
@@ -118,7 +118,7 @@ export class InitList<T> extends FixedList<T> {
     constructor (source: Iterable<T>, public f: Converter<T, void, InitList<T>>) { super(source); }
 
     *[Symbol.iterator]() {
-        const iter = this.source[Symbol.iterator]();
+        using iter = this.source[Symbol.iterator]();
         const { value, done } = iter.next();
         if (done) return value;
 

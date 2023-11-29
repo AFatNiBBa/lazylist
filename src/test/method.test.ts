@@ -36,7 +36,7 @@ test("assign", () => {
 
 test("but", () => {
     var sum = 0;
-    const temp = source.but(x => sum += x)[Symbol.iterator]();
+    using temp = source.but(x => sum += x)[Symbol.iterator]();
     expect(sum).toBe(0);
     temp.next();
     expect(sum).toBe(1);

@@ -10,24 +10,16 @@ export class ZipList<A, B, R = [ A, B ]> extends FixedList<A, R> {
     *[Symbol.iterator](): Generator<R> {
 
         var i = 0;
-        const source = this.source[Symbol.iterator]();
-        const other = this.other[Symbol.iterator]();
+        using source = this.source[Symbol.iterator]();
+        using other = this.other[Symbol.iterator]();
         
-        try
+        while(true)
         {
-            while(true)
-            {
-                const a = source.next();
-                if (a.done && !(this.mode & JoinMode.right)) break;
-                const b = other.next();
-                if (b.done && (a.done || !(this.mode & JoinMode.left))) break;
-                yield this.f(a.value, b.value, i++, this);
-            }
-        }
-        finally 
-        {
-            source.return?.();
-            other.return?.();
+            const a = source.next();
+            if (a.done && !(this.mode & JoinMode.right)) break;
+            const b = other.next();
+            if (b.done && (a.done || !(this.mode & JoinMode.left))) break;
+            yield this.f(a.value, b.value, i++, this);
         }
     }
 

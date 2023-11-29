@@ -266,7 +266,8 @@ export abstract class AbstractList<T> implements Iterable<T> {
 
     /**
      * Caches the iterator element one by one before they're yielded.
-     * Used to prevent multiple enumeration
+     * Used to prevent multiple enumeration.
+     * You have to dispose the list in order to ensure to dispose the inner iterator
      */
     cache() { return new CacheList(this); }
 
@@ -308,7 +309,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      */
     forEach(f?: Converter<T, void, this>) {
         var i = 0;
-        const iter = this[Symbol.iterator]()
+        using iter = this[Symbol.iterator]();
         for (var value: T; !({ value } = iter.next()).done; )
             f?.(value, i++, this);
         return value as ReturnType<this[typeof Symbol.iterator]>;
@@ -445,7 +446,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
      */
     same(f: Combinator<T, T, boolean, this> = EQUALS) {
         var i = 1, first: T;
-        const iter = this[Symbol.iterator]();
+        using iter = this[Symbol.iterator]();
         if (!({ value: first } = iter.next()).done)
             for (const elm of toGenerator(iter))
                 if (!f(elm, first, i++, this))

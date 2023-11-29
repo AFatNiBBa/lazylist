@@ -16,8 +16,8 @@ test("cache", () => {
     expect(wrappedCache.first === wrappedCache.first).toBe(true);
 
     const multi = source.cache();
-    const a = multi[Symbol.iterator]();
-    const b = multi[Symbol.iterator]();
+    using a = multi[Symbol.iterator]();
+    using b = multi[Symbol.iterator]();
     expect(a.next().value).toBe(1);
     expect(b.next().value).toBe(1);
     expect(b.next().value).toBe(2); // Swapped
@@ -28,7 +28,7 @@ test("cache", () => {
     expect(b.next().value).toBe(undefined);
 
     const where = source.skip(2).where().cache();
-    const c = where[Symbol.iterator]();
+    using c = where[Symbol.iterator]();
     c.next();
     expect(where.fastCount).toBe(NOT_FOUND);
     c.next();

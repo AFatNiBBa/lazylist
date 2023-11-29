@@ -60,7 +60,7 @@ test("finally", () => {
     }
 
     var ok = false;
-    const iter = linq(three).finally(() => ok = true)[Symbol.iterator]();
+    using iter = linq(three).finally(() => ok = true)[Symbol.iterator]();
     iter.next();
     expect(ok).toBe(false);
     iter.return(undefined);

@@ -20,7 +20,7 @@ export class InsertList<T> extends FixedList<T, T> {
         const [ list, i ] = calcIndex(this.source, this.i);
         if (i < 0) throw ErrorMsg.beforeBegin();
 
-        const iter = list[Symbol.iterator]();
+        using iter = list[Symbol.iterator]();
         const taken = yield* TakeList.take(iter, i);
         if (taken !== i) throw new RangeError("It's not possible to insert an element more than 1 place after the end of the original sequence");
 
@@ -44,7 +44,7 @@ export class RemoveAtList<T> extends FixedList<T, T> {
         const [ list, i ] = calcIndex(this.source, this.i);
         if (i < 0) throw ErrorMsg.beforeBegin();
 
-        const iter = list[Symbol.iterator]();
+        using iter = list[Symbol.iterator]();
         const taken = yield* TakeList.take(iter, i);
         if (taken !== i || iter.next().done) throw ErrorMsg.afterEnd();
 

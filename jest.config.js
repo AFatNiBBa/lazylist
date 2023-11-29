@@ -9,7 +9,7 @@ module.exports = {
       {
         diagnostics: false,
         tsconfig: {
-          target: "ESNext",
+          target: "ES2022",
           esModuleInterop: true
         }
       }
