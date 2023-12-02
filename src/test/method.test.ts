@@ -72,6 +72,16 @@ test("toSet", () => {
     expect(() => source.toSet(true)).toThrow(RangeError);
 });
 
+test("inBound", () => {
+    expect(source.inBound(0)).toBe(true);
+    expect(source.inBound(2)).toBe(true);
+    expect(source.inBound(3)).toBe(false);
+    expect(source.inBound(-1)).toBe(true);
+    expect(source.inBound(-3)).toBe(true);
+    expect(source.inBound(-4)).toBe(false);
+    expect(linq().inBound(-1)).toBe(false);
+});
+
 test("at", () => {
     expect(source.at(0)).toBe(1);
     expect(source.at(1)).toBe(2);
@@ -178,7 +188,7 @@ test("multiCount", () => {
     expect(div5).toBe(0);
 });
 
-test("find", () => {
+test("find - indexOf", () => {
     const [ twoI, twoV ] = source.find(x => x % 2 == 0);
     expect(twoI).toBe(1);
     expect(twoV).toBe(2);
@@ -186,6 +196,9 @@ test("find", () => {
     const [ unknown, nothing ] = source.find(x => x === 5);
     expect(unknown).toBe(-1);
     expect(nothing).toBe(undefined);
+
+    expect(source.indexOf(2)).toBe(1);
+    expect(source.indexOf(4)).toBe(-1);
 });
 
 test("sum", () => expect(source.sum).toBe(6));
@@ -196,4 +209,9 @@ test("count", () => {
     const temp = source.where(TRUE);
     expect(temp.fastCount).toBe(NOT_FOUND);
     expect(temp.count).toBe(3);
+
+    var ok = true;
+    const but = source.but(() => ok = false);
+    expect(but.count).toBe(3);
+    expect(ok).toBe(true);
 });

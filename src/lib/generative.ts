@@ -1,6 +1,5 @@
 
-import linq from "..";
-import ErrorMsg from "../util/errorMsg";
+import type linq from "..";
 import { AbstractList } from "./abstract";
 
 /** A list with absolutely no items */
@@ -9,7 +8,19 @@ export class EmptyList extends AbstractList<any> {
 
     *[Symbol.iterator]() { }
 
-    at(_: number) { throw new RangeError("There is no element in an empty list"); }
+    /**
+     * -
+     * Returns always `false`
+     * @inheritdoc
+     */
+    inBound(_: number) { return false as const; }
+
+    /**
+     * -
+     * Returns always {@link def}
+     * @inheritdoc
+     */
+    at<O = undefined>(_: number, def?: O): O { return def!; }
     
     get fastCount() { return 0; }
 }
@@ -61,13 +72,10 @@ export class RangeList extends AbstractList<number> {
      * Uses math to get the value at O(1)
      * @inheritdoc 
      */
-    at(i: number) {
-        if (i < 0)
-            if ((i += this.length) < 0)
-                throw ErrorMsg.beforeBegin();
-        if (i >= this.length)
-            throw ErrorMsg.afterEnd();
-        return i * this.step + this.start;
+    at<O = undefined>(i: number, def?: O) {
+        return i < 0 && ((i += this.length) < 0) || i >= this.length
+            ? def!
+            : i * this.step + this.start;        
     }
 
     get fastCount() { return this.length; }

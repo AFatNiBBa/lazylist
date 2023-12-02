@@ -1,8 +1,4 @@
 
-import ErrorMsg from "../util/errorMsg";
-import { COMPARE, EQUALS, IDENTITY, NOT_FOUND, calcIndex, isReadonlyArray } from "../util/util";
-import { Combinator, Comparer, Converter, JoinMode, Predicate, by, toGenerator } from "..";
-
 /** An iterable wrapper with helper functions */
 export abstract class AbstractList<T> implements Iterable<T> {
     abstract [Symbol.iterator](): IterableIterator<T>;
@@ -343,14 +339,28 @@ export abstract class AbstractList<T> implements Iterable<T> {
     }
 
     /**
-     * Gets the element at index {@link i}.
-     * If {@link i} is negative, the index will be calculated from the end of the list.
-     * If the index is before the beginning of the list or after the end, it will throw a {@link RangeError}
-     * @param i The index of the desired element
+     * Tells if the element at the given index can be retrieved
+     * @param i The index to check; If negative it starts from the end
      */
-    at(i: number) {
+    inBound(i: number) {
+        if (i < 0) return this.count + i >= 0;
+        const { fastCount } = this;
+        if (!isNaN(fastCount)) return i < fastCount;
+        for (const _ of this)
+            if (!i--)
+                return true;
+        return false;
+    }
+
+    /**
+     * Gets the element at index {@link i}.
+     * If {@link i} is negative, the index will be calculated from the end of the list
+     * @param i The index of the desired element
+     * @param def The default value to return if there's no element at index {@link i}
+     */
+    at<O = undefined>(i: number, def?: O): T | O {
         const [ list ] = [ , i ] = calcIndex(this, i);
-        if (i < 0) throw ErrorMsg.beforeBegin();
+        if (i < 0) return def!;
         if (isReadonlyArray(list))
             if (i < list.length)
                 return list[i];
@@ -358,7 +368,7 @@ export abstract class AbstractList<T> implements Iterable<T> {
         else for (const elm of this)
             if (!i--)
                 return elm;
-        throw ErrorMsg.afterEnd();
+        return def!;
     }
 
     /**
@@ -415,8 +425,15 @@ export abstract class AbstractList<T> implements Iterable<T> {
     minBy<K>(f: Converter<T, K, this>, comp?: Comparer<K, this>): T { return this.min(by(f, comp)); }
 
     /**
-     * Returns `true` if a value is in the list
-     * @param value The value
+     * Returns the index of {@link value} in the list if found, `-1` otherwise
+     * @param value The value to search for
+     * @param f An equality comparison function; The second argument is always {@link value}
+     */
+    indexOf(value: T, f: Combinator<T, T, boolean, this> = EQUALS) { return this.find((x, i, list) => f(x, value, i, list))[0]; }
+
+    /**
+     * Returns `true` if {@link value} is in the list
+     * @param value The value to search for
      * @param f An equality comparison function; The second argument is always {@link value}
      */
     has(value: T, f: Combinator<T, T, boolean, this> = EQUALS) { return this.any((x, i, list) => f(x, value, i, list)); }
@@ -508,12 +525,16 @@ export abstract class AbstractList<T> implements Iterable<T> {
         return sum / i as any;
     }
 
-    /** Calculates the length of the list */
+    /**
+     * Calculates the length of the list.
+     * It returns {@link fastCount} if it's not {@link NaN}
+     */
     get count() {
-        var i = 0;
-        for (const _ of this)
-            i++;
-        return i;
+        const temp = this.fastCount;
+        if (!isNaN(temp)) return temp;
+        var out = 0;
+        for (const _ of this) out++;
+        return out;
     }
 }
 
@@ -528,8 +549,11 @@ export abstract class SourceList<I, O> extends AbstractList<O> {
     *[Symbol.iterator](): IterableIterator<O> { return yield* <any>this.source; }
 }
 
-// These are needed to be imported AFTER the definition of "AbstractList", because it is needed IMMEDIATELY by all of them
+// These are needed to be imported AFTER the definition of "AbstractList", because it is needed IMMEDIATELY by them; For semplicity, ALL the imports are here
+import ErrorMsg from "../util/errorMsg";
 import { DefaultList, FinallyList, FixedList, InitList, MergeList, OnceList, RepeatList, ReverseList, ShuffleList, WrapList } from "./simple";
+import { COMPARE, EQUALS, IDENTITY, NOT_FOUND, calcIndex, isReadonlyArray } from "../util/util";
+import { Combinator, Comparer, Converter, JoinMode, Predicate, by, toGenerator } from "..";
 import { CaseList, DistinctList, IntersectList, WhereList } from "./where";
 import { SelectList, SelectManyList, SelectWhereList } from "./select";
 import { InsertList, RemoveAtList } from "./element";

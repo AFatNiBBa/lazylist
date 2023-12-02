@@ -46,7 +46,7 @@ export class RemoveAtList<T> extends FixedList<T, T> {
 
         using iter = list[Symbol.iterator]();
         const taken = yield* TakeList.take(iter, i);
-        if (taken !== i || iter.next().done) throw ErrorMsg.afterEnd();
+        if (taken !== i || iter.next().done) throw new RangeError("The provided index points after the end of the sequence");
 
         return yield* toGenerator(iter);
     }

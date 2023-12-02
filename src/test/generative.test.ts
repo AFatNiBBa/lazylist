@@ -7,7 +7,9 @@ test("empty", () => {
     const list = linq<number>();
     expect(list).toBeInstanceOf(EmptyList);
     checkLengthFastCount(list, 0);
-    expect(() => list.at(0)).toThrow(RangeError);
+    expect(list.inBound(0)).toBe(false);
+    const outOfRange = {};
+    expect(list.at(0, outOfRange)).toBe(outOfRange);
 });
 
 test("rand", () => {

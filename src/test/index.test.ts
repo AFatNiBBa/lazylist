@@ -37,7 +37,7 @@ test("fastCount", () => {
 
 test("toGenerator", () => {
     var i = 0;
-    checkLength(toGenerator<number>({
+    checkLength(toGenerator(<Iterator<number>>{
         next: () => i < 3
             ? { value: i++ + 1, done: false }
             : { value: undefined, done: true }

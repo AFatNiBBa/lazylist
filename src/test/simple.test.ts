@@ -14,8 +14,11 @@ test("wrap", () => {
     expect(value).toHaveLength(1);
     expect(list.fastCount).toBe(1);
     expect(list.reverse()).toBe(list);
+    expect(list.inBound(0)).toBe(true);
+    expect(list.inBound(1)).toBe(false);
     expect(list.at(0)).toBe(source);
-    expect(() => list.at(1)).toThrow(RangeError);
+    const outOfRange = {};
+    expect(list.at(1, outOfRange)).toBe(outOfRange);
 });
 
 test("default", () => {

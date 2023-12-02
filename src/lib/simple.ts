@@ -1,6 +1,5 @@
 
-import ErrorMsg from "../util/errorMsg";
-import linq, { Converter, fastCount, toGenerator } from "..";
+import { Converter, fastCount, type linq, toGenerator } from "..";
 import { AbstractList, SourceList } from "./abstract"; 
 import { NOT_FOUND, calcArray } from "../util/util";
 import { RandList } from "./generative";
@@ -32,10 +31,18 @@ export class WrapList<T, TList extends Iterable<T>> extends SourceList<T, TList>
      * Does fast checks knowing the fact that there's just one element
      * @inheritdoc
      */
-    at(i: number) {
-        if (i === 0 || i === -1)
+    inBound(i: number) { return i === 0 || i === -1; }
+
+    /**
+     * -
+     * Does fast checks knowing the fact that there's just one element
+     * @inheritdoc
+     */
+    at<O = undefined>(i: number, def?: O) {
+        if (this.inBound(i))
             return <TList>this.source;
-        throw new RangeError("There is just one element in a wrapped list");
+        return def!;
+        
     }
 
     get fastCount() { return 1; }
@@ -92,12 +99,12 @@ export class ReverseList<T> extends FixedList<T, T> {
      * Computes negative indexes lazily due to the reversing
      * @inheritdoc
      */
-    at(i: number) {
-        if (i >= 0) return super.at(i);
+    at<O = undefined>(i: number, def?: O) {
+        if (i >= 0) return super.at(i, def);
         for (const elm of this.source)
             if (!++i)
                 return elm;
-        throw ErrorMsg.beforeBegin();
+        return def!;
     }
 }
 

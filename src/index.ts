@@ -7,6 +7,7 @@ import { AbstractList } from "./lib/abstract";
 import { FixedList } from "./lib/simple";
 import { ArrayList } from "./lib/array";
 
+export * from "./lib/buffer";
 export default linq;
 
 /** A function that maps a value into another */
@@ -43,7 +44,7 @@ export enum JoinMode {
  */
 export function linq<T>(source?: Iterable<T> | Iterator<T> | (() => Iterator<T>) | null, force = false): AbstractList<T> {
     return source == null
-        ? <AbstractList<T>>EmptyList.instance
+        ? <any>EmptyList.instance
         : !force && source instanceof AbstractList
             ? <AbstractList<T>>source
             : new FixedList(

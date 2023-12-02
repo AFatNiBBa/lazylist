@@ -33,7 +33,7 @@ export const COMPARE = (a: any, b: any) => a > b ? 1 : a < b ? -1 : 0;
  * @param source The value to check
  */
 export function isReadonlyArray<T>(source: Iterable<T>): source is readonly T[] {
-    return typeof source === "string" || source instanceof String || source instanceof Array || source instanceof TypedArray;
+    return typeof source === "string" || Array.isArray(source) || source instanceof Array || source instanceof String || source instanceof TypedArray;
 }
 
 /**
