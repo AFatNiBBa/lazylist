@@ -184,11 +184,11 @@ export abstract class AbstractList<T> implements Iterable<T> {
      * @param start The index to start at; Can be whatever you can pass as the first argument of {@link skip}
      * @param length The length of the section; Can be whatever you can pass as the first argument of {@link take}
      * @param padEnd If truthy and {@link length} is more than the list length, the output list will be forced to have length {@link length} by concatenating as many {@link def} as needed
-     * @param leftOnNegative Usually, if {@link length} is negative, the last -{@link length} elements will be SKIPPED; If `true`, the last -{@link length} elements before {@link start} will be taken instead; Only works if both {@link start} and {@link length} are numbers
+     * @param leftOnNegative Usually, if {@link length} is negative, the last -{@link length} elements will be SKIPPED; If `true`, the last -{@link length} elements ending in {@link start} will be taken instead; Only works if both {@link start} and {@link length} are numbers
      */
     slice(start: Predicate<T, SkipList<T>> | number, length: Predicate<T, TakeList<T>> | number, padEnd?: JoinMode | boolean, def?: T, leftOnNegative = false) {
         if (typeof start === "number" && typeof length === "number" && length < 0 && leftOnNegative)
-            start -= (length *= -1);
+            start -= (length *= -1) - 1;
         return this.skip(start, true).take(length, padEnd, def, true);
     }
 

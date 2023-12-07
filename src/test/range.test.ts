@@ -29,8 +29,8 @@ test("slice", () => {
     check(source.slice(-4, 3), [ 4, 5, 6 ]);
     check(source.slice(-4, -3), [ 4 ]);
     check(source.slice(4, -2), [ 5 ]);
-    check(source.slice(-4, -2, undefined, undefined, true), [ 2, 3 ]);
-    check(source.slice(4, -2, undefined, undefined, true), [ 3, 4 ]);
+    check(source.slice(-4, -2, undefined, undefined, true), [ 3, 4 ]);
+    check(source.slice(4, -2, undefined, undefined, true), [ 4, 5 ]);
 
     check(source.slice(5, 3, true), [ 6, 7, undefined ]); 
     check(source.slice(5, 3, true, 12), [ 6, 7, 12 ]); 
